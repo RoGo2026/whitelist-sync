@@ -2,8 +2,8 @@ name: Скачивать mobile-whitelist-1.txt каждый час на GitVers
 
 on:
   schedule:
-    - cron: '0 * * * *'   # Каждый час в начале часа (UTC)
-  workflow_dispatch:      # Ручной запуск
+    - cron: '0 * * * *'
+  workflow_dispatch:
 
 jobs:
   download-and-update:
@@ -16,42 +16,38 @@ jobs:
           curl -L -f --fail-early -o ./download/mobile-whitelist-1.txt \
             https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt
           
-          # Проверка, что файл скачан и не пустой
           if [ ! -s ./download/mobile-whitelist-1.txt ]; then
             echo "Ошибка: скачанный файл пустой или не был загружен."
             exit 1
           fi
           echo "Файл успешно скачан с GitHub."
 
-      - name: Клонировать репозиторий GitVerse (ветка master)
+      - name: Клонировать репозиторий GitVerse
         run: |
-          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
+          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/whitelist-sync.git ./repo
           echo "Репозиторий успешно клонирован."
 
       - name: Обновить файл и отправить изменения
         working-directory: ./repo
         run: |
-          # Настройка git
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
           
-          # Копируем свежий файл из папки download
           cp ../download/mobile-whitelist-1.txt mobile-whitelist-1.txt
           
-          # Проверяем, есть ли изменения
           git add mobile-whitelist-1.txt
           
           if git diff --staged --quiet; then
             echo "Файл не изменился — обновление не требуется."
           else
-                        git commit -m "Автообновление: mobile-whitelist-1.txt ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))"
+            git commit -m "Автообновление: mobile-whitelist-1.txt ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))"
             
-            # Пушим с учётом возможных названий ветки
-            if git push origin HEAD:master 2>/dev/null; then
+            # Пушим в master (основная ветка на большинстве репозиториев GitVerse)
+            if git push origin HEAD:master; then
               echo "Файл успешно обновлён на GitVerse (ветка master)."
-            elif git push origin HEAD:main 2>/dev/null; then
-              echo "Файл успешно обновлён на GitVerse (ветка main)."
             else
-              echo "Ошибка push: проверьте название основной ветки на GitVerse."
-              exit 1
+              echo "Ошибка при push в master. Пробуем main..."
+              git push origin HEAD:main || exit 1
+              echo "Файл успешно обновлён на GitVerse (ветка main)."
             fi
+          fi
