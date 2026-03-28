@@ -1,10 +1,8 @@
-name: Скачивать mobile-whitelist-1.txt каждые 5 минут на GitVerse
-
-# Force re-register schedule - test 05 (28.03.2026) 
+name: Скачивать mobile-whitelist-1.txt на GitVerse
 
 on:
   schedule:
-  - cron: '*/10 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -17,26 +15,27 @@ jobs:
           mkdir -p ./download
           curl -L -f --fail-early -o ./download/mobile-whitelist-1.txt \
             "https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt"
-          echo "✅ Файл скачан с GitHub"
+          echo "Файл скачан"
 
-      - name: Клонировать репозиторий GitVerse
+      - name: Клонировать GitVerse
         run: |
           git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
-          echo "✅ Репозиторий клонирован"
 
-      - name: Принудительно обновить файл
+      - name: Обновить файл
         working-directory: ./repo
         run: |
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
-          
+
           cp -f ../download/mobile-whitelist-1.txt mobile-whitelist-1.txt
-          
-          # Принудительное изменение содержимого
-          echo "# Last updated by GitHub Action: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> mobile-whitelist-1.txt
-          
+
+          echo "# Updated $(date -u)" >> mobile-whitelist-1.txt
+
           git add mobile-whitelist-1.txt
-          
-          git commit -m "Автообновление: mobile-whitelist-1.txt ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))" --allow-empty
-          
-          git push origin HEAD:master && echo "✅ Успешно обновлено на GitVerse" || echo "❌ Ошибка push"
+          git commit -m "auto update $(date -u)" || echo "Нет изменений"
+          git push
+
+      # 👇 ВАЖНО: Самоперезапуск
+      - name: Принудительно активировать расписание
+        run: |
+          echo "re-activate schedule $(date)" >> force.txt
