@@ -2,35 +2,35 @@ name: Скачивать mobile-whitelist-1.txt каждый час на GitVers
 
 on:
   schedule:
-    - cron: '0 * * * *'      # Каждый час в 00 минут по UTC
-  workflow_dispatch:         # Можно запускать вручную
+    - cron: '0 * * * *'
+  workflow_dispatch:
 
 jobs:
   download-and-update:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Скачать файл с GitHub
+        run: |
+          mkdir -p ./repo
+          curl -L -f -o ./repo/mobile-whitelist-1.txt \
+            https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt
+
       - name: Checkout репозитория на GitVerse
         uses: actions/checkout@v4
         with:
-          repository: RoGo/mobile-whitelist          # ← Замените на точное название вашего репозитория на GitVerse
+          repository: RoGo/mobile-whitelist          # ← ИЗМЕНИТЕ НА ТОЧНОЕ НАЗВАНИЕ ВАШЕГО РЕПОЗИТОРИЯ НА GITVERSE
           token: ${{ secrets.WHITELIST_TOKEN }}
-          path: target-repo
+          path: ./repo
           ref: main
 
-      - name: Скачать файл с GitHub
-        run: |
-          mkdir -p target-repo/configs
-          curl -L -f -o target-repo/configs/mobile-whitelist-1.txt \
-            https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt
-
       - name: Загрузить файл на GitVerse
-        working-directory: ./target-repo
+        working-directory: ./repo
         run: |
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
           
-          git add configs/mobile-whitelist-1.txt
+          git add mobile-whitelist-1.txt
           
           if git diff --staged --quiet; then
             echo "Файл не изменился — обновление не требуется."
