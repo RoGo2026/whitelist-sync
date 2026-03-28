@@ -36,6 +36,6 @@ jobs:
             echo "Файл не изменился — обновление не требуется."
           else
             git commit -m "Автообновление: mobile-whitelist-1.txt ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))"
-            git push origin HEAD:main
+            git push origin HEAD:master
             echo "Файл успешно обновлён на GitVerse."
           fi
