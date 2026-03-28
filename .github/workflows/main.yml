@@ -1,8 +1,8 @@
-name: Скачивать mobile-whitelist-1.txt каждые 5 минут на GitVerse (принудительно)
+name: Скачивать mobile-whitelist-1.txt каждые 5 минут на GitVerse
 
 on:
   schedule:
-    - cron: '*/5 * * * *'     # каждые 5 минут
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -10,34 +10,34 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Скачать актуальный файл с GitHub
+      - name: Скачать файл с GitHub
         run: |
           mkdir -p ./download
           curl -L -f --fail-early -o ./download/mobile-whitelist-1.txt \
             "https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt"
           
           echo "✅ Файл скачан с GitHub"
-          echo "Размер: $(wc -c < ./download/mobile-whitelist-1.txt) байт"
+          echo "Размер файла: $(wc -c < ./download/mobile-whitelist-1.txt) байт"
 
-      - name: Клонировать репозиторий GitVerse
+      - name: Клонировать репозиторий GitVerse (mobile-whitelist)
         run: |
           git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
-          echo "✅ Репозиторий GitVerse успешно клонирован"
+          echo "✅ Репозиторий mobile-whitelist успешно клонирован"
 
-      - name: Принудительно обновить файл на GitVerse
+      - name: Принудительно обновить файл
         working-directory: ./repo
         run: |
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
           
-          # Копируем файл
           cp ../download/mobile-whitelist-1.txt mobile-whitelist-1.txt
           
-          # Принудительно добавляем и коммитим (даже если файл не изменился)
           git add mobile-whitelist-1.txt
           
-          git commit -m "Автообновление: mobile-whitelist-1.txt ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))" --allow-empty
+          # Принудительный коммит даже без изменений
+          git commit -m "Автообновление: mobile-whitelist-1.txt ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))" --allow-empty || echo "Коммит не создан (возможно, уже есть такой же)"
           
+          echo "Выполняем push в master..."
           git push origin HEAD:master
           
-          echo "✅ Файл принудительно обновлён на GitVerse (ветка master)"
+          echo "✅ Операция завершена. Проверьте GitVerse."
