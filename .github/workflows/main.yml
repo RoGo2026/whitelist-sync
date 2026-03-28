@@ -15,30 +15,31 @@ jobs:
           mkdir -p ./download
           curl -L -f --fail-early -o ./download/mobile-whitelist-1.txt \
             "https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt"
-          
-          echo "Файл успешно скачан с GitHub"
+          echo "Файл скачан с GitHub"
 
       - name: Клонировать репозиторий GitVerse
         run: |
           git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
           echo "Репозиторий успешно клонирован"
 
-      - name: Принудительно обновить файл на GitVerse
+      - name: Принудительно обновить файл (с меткой времени)
         working-directory: ./repo
         run: |
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
           
-          # Копируем файл (принудительно)
-          cp -f ../download/mobile-whitelist-1.txt mobile-whitelist-1.txt
+          # Копируем оригинальный файл
+          cp ../download/mobile-whitelist-1.txt mobile-whitelist-1.txt
           
-          # Добавляем файл
+          # Добавляем строку с текущим временем в конец файла (принудительное изменение)
+          echo "" >> mobile-whitelist-1.txt
+          echo "# Last updated by GitHub Action: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> mobile-whitelist-1.txt
+          
           git add mobile-whitelist-1.txt
           
-          # Создаём коммит даже если файл не изменился
-          git commit -m "Автообновление: mobile-whitelist-1.txt ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))" --allow-empty
+          # Коммит с принудительным обновлением
+          git commit -m "Автообновление: mobile-whitelist-1.txt ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))"
           
-          # Пушим
           git push origin HEAD:master
           
-          echo "✅ Файл принудительно обновлён на GitVerse (новый коммит создан)"
+          echo "✅ Файл принудительно обновлён на GitVerse с новой меткой времени"
