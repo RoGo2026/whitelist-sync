@@ -1,10 +1,10 @@
 name: Скачивать mobile-whitelist-1.txt каждые 5 минут на GitVerse
 
-# Force re-register schedule - test 04 (28.03.2026)
+# Force re-register schedule - test 05 (28.03.2026) 
 
 on:
   schedule:
-    - cron: '*/5 * * * *'      # каждые 5 минут
+  - cron: '*/10 * * * *'
   workflow_dispatch:
 
 jobs:
