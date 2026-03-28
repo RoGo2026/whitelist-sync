@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-            - name: Скачать актуальный файл с GitVerse (raw API)
+      - name: Скачать актуальный файл с GitVerse (raw API)
         run: |
           mkdir -p ./download
           curl -L -f --fail-early -o ./download/mobile-whitelist-1.txt \
@@ -20,7 +20,7 @@ jobs:
             echo "Ошибка: файл не скачан или пустой."
             exit 1
           fi
-          echo "Файл успешно скачан с GitVerse через API (raw)."
+          echo "Файл успешно скачан с GitVerse через API."
 
       - name: Клонировать репозиторий GitVerse
         run: |
