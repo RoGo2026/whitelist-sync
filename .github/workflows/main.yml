@@ -2,7 +2,7 @@ name: Скачивать mobile-whitelist-1.txt каждый час на GitVers
 
 on:
   schedule:
-    - cron: '0/5 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
