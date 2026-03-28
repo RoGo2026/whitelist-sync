@@ -1,8 +1,9 @@
+# v2.0 - fixed schedule registration (28.03.2026)
 name: Скачивать mobile-whitelist-1.txt каждый час на GitVerse
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '0/5 * * * *'
   workflow_dispatch:
 
 jobs:
