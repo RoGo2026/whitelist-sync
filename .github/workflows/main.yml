@@ -2,34 +2,43 @@ name: Скачивать mobile-whitelist-1.txt каждый час на GitVers
 
 on:
   schedule:
-    - cron: '0 * * * *'
-  workflow_dispatch:
+    - cron: '0 * * * *'   # Каждый час в начале часа (UTC)
+  workflow_dispatch:      # Ручной запуск
 
 jobs:
   download-and-update:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Скачать файл с GitHub
+      - name: Скачать актуальный файл с GitHub
         run: |
-          mkdir -p ./repo
-          curl -L -f -o ./repo/mobile-whitelist-1.txt \
+          mkdir -p ./download
+          curl -L -f --fail-early -o ./download/mobile-whitelist-1.txt \
             https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt
+          
+          # Проверка, что файл скачан и не пустой
+          if [ ! -s ./download/mobile-whitelist-1.txt ]; then
+            echo "Ошибка: скачанный файл пустой или не был загружен."
+            exit 1
+          fi
+          echo "Файл успешно скачан с GitHub."
 
-      - name: Checkout репозитория на GitVerse
-        uses: actions/checkout@v4
-        with:
-          repository: RoGo/mobile-whitelist          # ← ИЗМЕНИТЕ НА ТОЧНОЕ НАЗВАНИЕ ВАШЕГО РЕПОЗИТОРИЯ НА GITVERSE
-          token: ${{ secrets.WHITELIST_TOKEN }}
-          path: ./repo
-          ref: main
+      - name: Клонировать репозиторий GitVerse (ветка master)
+        run: |
+          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
+          echo "Репозиторий успешно клонирован."
 
-      - name: Загрузить файл на GitVerse
+      - name: Обновить файл и отправить изменения
         working-directory: ./repo
         run: |
+          # Настройка git
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
           
+          # Копируем свежий файл из папки download
+          cp ../download/mobile-whitelist-1.txt mobile-whitelist-1.txt
+          
+          # Проверяем, есть ли изменения
           git add mobile-whitelist-1.txt
           
           if git diff --staged --quiet; then
@@ -37,5 +46,5 @@ jobs:
           else
             git commit -m "Автообновление: mobile-whitelist-1.txt ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))"
             git push origin HEAD:master
-            echo "Файл успешно обновлён на GitVerse."
+            echo "Файл успешно обновлён на GitVerse (ветка master)."
           fi
