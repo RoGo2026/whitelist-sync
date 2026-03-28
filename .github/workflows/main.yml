@@ -24,7 +24,7 @@ jobs:
 
       - name: Клонировать репозиторий GitVerse
         run: |
-          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/whitelist-sync.git ./repo
+          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
           echo "Репозиторий успешно клонирован."
 
       - name: Обновить файл и отправить изменения
