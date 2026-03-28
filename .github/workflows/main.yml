@@ -1,8 +1,8 @@
-name: Скачивать mobile-whitelist-1.txt каждые 5 минут на GitVerse
+name: Скачивать mobile-whitelist-1.txt каждый час на GitVerse (принудительно)
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '0 * * * *'      # каждый час
   workflow_dispatch:
 
 jobs:
@@ -16,28 +16,29 @@ jobs:
           curl -L -f --fail-early -o ./download/mobile-whitelist-1.txt \
             "https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt"
           
-          echo "✅ Файл скачан с GitHub"
-          echo "Размер файла: $(wc -c < ./download/mobile-whitelist-1.txt) байт"
+          echo "Файл успешно скачан с GitHub"
 
-      - name: Клонировать репозиторий GitVerse (mobile-whitelist)
+      - name: Клонировать репозиторий GitVerse
         run: |
           git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
-          echo "✅ Репозиторий mobile-whitelist успешно клонирован"
+          echo "Репозиторий успешно клонирован"
 
-      - name: Принудительно обновить файл
+      - name: Принудительно обновить файл на GitVerse
         working-directory: ./repo
         run: |
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
           
-          cp ../download/mobile-whitelist-1.txt mobile-whitelist-1.txt
+          # Копируем файл (принудительно)
+          cp -f ../download/mobile-whitelist-1.txt mobile-whitelist-1.txt
           
+          # Добавляем файл
           git add mobile-whitelist-1.txt
           
-          # Принудительный коммит даже без изменений
-          git commit -m "Автообновление: mobile-whitelist-1.txt ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))" --allow-empty || echo "Коммит не создан (возможно, уже есть такой же)"
+          # Создаём коммит даже если файл не изменился
+          git commit -m "Автообновление: mobile-whitelist-1.txt ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))" --allow-empty
           
-          echo "Выполняем push в master..."
+          # Пушим
           git push origin HEAD:master
           
-          echo "✅ Операция завершена. Проверьте GitVerse."
+          echo "✅ Файл принудительно обновлён на GitVerse (новый коммит создан)"
