@@ -10,17 +10,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Скачать актуальный файл с GitVerse (raw API)
+      - name: Скачать актуальный файл с GitHub
         run: |
           mkdir -p ./download
           curl -L -f --fail-early -o ./download/mobile-whitelist-1.txt \
-            "https://gitverse.ru/api/repos/RoGo/mobile-whitelist/raw/branch/master/mobile-whitelist-1.txt"
+            "https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt"
           
           if [ ! -s ./download/mobile-whitelist-1.txt ]; then
-            echo "Ошибка: файл не скачан или пустой."
+            echo "Ошибка: файл не скачан или пустой с GitHub."
             exit 1
           fi
-          echo "Файл успешно скачан с GitVerse через API."
+          
+          echo "Файл успешно скачан с GitHub. Размер: $(wc -c < ./download/mobile-whitelist-1.txt) байт"
+          echo "Первые 3 строки:"
+          head -n 3 ./download/mobile-whitelist-1.txt
 
       - name: Клонировать репозиторий GitVerse
         run: |
@@ -42,5 +45,5 @@ jobs:
           else
             git commit -m "Автообновление: mobile-whitelist-1.txt ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))"
             git push origin HEAD:master
-            echo "Файл успешно обновлён на GitVerse (ветка master)."
+            echo "✅ Файл успешно обновлён на GitVerse (ветка master)."
           fi
