@@ -1,4 +1,7 @@
-name: Скачивать mobile-whitelist-1.txt каждый час на GitVerse (принудительно)
+name: Скачивать mobile-whitelist-1.txt каждые 5 минут на GitVerse
+
+# Force re-register schedule - test 03
+# Этот комментарий добавлен для перерегистрации расписания
 
 on:
   schedule:
@@ -15,31 +18,23 @@ jobs:
           mkdir -p ./download
           curl -L -f --fail-early -o ./download/mobile-whitelist-1.txt \
             "https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt"
-          echo "Файл скачан с GitHub"
 
       - name: Клонировать репозиторий GitVerse
         run: |
           git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
-          echo "Репозиторий успешно клонирован"
 
-      - name: Принудительно обновить файл (с меткой времени)
+      - name: Принудительно обновить файл
         working-directory: ./repo
         run: |
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
           
-          # Копируем оригинальный файл
-          cp ../download/mobile-whitelist-1.txt mobile-whitelist-1.txt
+          cp -f ../download/mobile-whitelist-1.txt mobile-whitelist-1.txt
           
-          # Добавляем строку с текущим временем в конец файла (принудительное изменение)
-          echo "" >> mobile-whitelist-1.txt
           echo "# Last updated by GitHub Action: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> mobile-whitelist-1.txt
           
           git add mobile-whitelist-1.txt
           
-          # Коммит с принудительным обновлением
-          git commit -m "Автообновление: mobile-whitelist-1.txt ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))"
+          git commit -m "Автообновление: mobile-whitelist-1.txt ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))" --allow-empty
           
-          git push origin HEAD:master
-          
-          echo "✅ Файл принудительно обновлён на GitVerse с новой меткой времени"
+          git push origin HEAD:master && echo "✅ Успешно обновлено на GitVerse" || echo "❌ Ошибка при push"
