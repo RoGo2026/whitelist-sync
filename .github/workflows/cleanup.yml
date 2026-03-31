@@ -2,8 +2,8 @@ name: Cleanup All Workflow Runs
 
 on:
   workflow_dispatch:  # Запуск вручную
-  # schedule:
-  #   - cron: '0 1 * * *'
+  schedule:
+     - cron: '0 1 * * *'
 
 jobs:
   cleanup:
