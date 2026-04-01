@@ -18,16 +18,16 @@ jobs:
           # Добавляйте или удаляйте строки по необходимости — скрипт адаптируется автоматически
           urls=(
             "https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt"
-            #"https://raw.githubusercontent.com/VP01596/vless-top15/refs/heads/main/All.txt"
             "https://raw.githubusercontent.com/VPN-cat/VPN/refs/heads/main/configs/VPN-cat-top-100"
             "https://raw.githubusercontent.com/EtoNeYaProject/etoneyaproject.github.io/refs/heads/main/whitelist"
+            #"https://raw.githubusercontent.com/VP01596/vless-top15/refs/heads/main/All.txt"
             # "https://raw.githubusercontent.com/zieng2/wl/refs/heads/main/vless_lite.txt"
             # "https://raw.githubusercontent.com/RKPchannel/RKP_bypass_configs/refs/heads/main/configs/url_work.txt"
             # "https://raw.githubusercontent.com/Maskkost93/kizyak-vpn-4.0/refs/heads/main/kizyaktestru.txt"
             # "https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/refs/heads/main/githubmirror/1.txt"
             # "https://raw.githubusercontent.com/FLEXIY0/matryoshka-vpn/main/configs/russia_whitelist.txt"
                       
-            )
+          )
           
           # Скачиваем каждый файл, если список не пуст
           if [ ${#urls[@]} -gt 0 ]; then
