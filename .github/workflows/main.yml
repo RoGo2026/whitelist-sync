@@ -17,7 +17,7 @@ jobs:
           # Список URL для скачивания
           # Добавляйте или удаляйте строки по необходимости — скрипт адаптируется автоматически
           urls=(
-            "https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt"
+            "https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/refs/heads/main/configs/mobile-whitelist-1.txt"
             # "https://raw.githubusercontent.com/Maskkost93/kizyak-vpn-4.0/refs/heads/main/kizyaktestru.txt"
             # "https://raw.githubusercontent.com/zieng2/wl/refs/heads/main/vless_lite.txt"
           )
