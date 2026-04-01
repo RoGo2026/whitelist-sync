@@ -17,7 +17,8 @@ jobs:
           # Список URL для скачивания (3 источника)
           urls=(
             "https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt"
-            "https://raw.githubusercontent.com/RKPchannel/RKP_bypass_configs/refs/heads/main/configs/url_work.txt"
+          # "https://raw.githubusercontent.com/RKPchannel/RKP_bypass_configs/refs/heads/main/configs/url_work.txt"
+            
            )
           
           # Скачиваем каждый файл
