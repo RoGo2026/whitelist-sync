@@ -10,12 +10,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Скачать файл с GitHub
+      - name: Скачать файлы с источников
         run: |
           mkdir -p ./download
-          curl -L -f --fail-early -o ./download/mobile-whitelist-1.txt \
+          
+          # Список URL для скачивания (3 источника)
+          urls=(
             "https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt"
-          echo "Файл скачан"
+            "https://raw.githubusercontent.com/Maskkost93/kizyak-vpn-4.0/refs/heads/main/kizyaktestru.txt"
+            "https://raw.githubusercontent.com/zieng2/wl/refs/heads/main/vless_lite.txt"
+          )
+          
+          # Скачиваем каждый файл
+          for url in "${urls[@]}"; do
+            filename=$(basename "$url")
+            curl -L -f --fail-early -o "./download/$filename" "$url"
+            echo "Скачан: $filename"
+          done
+
+      - name: Объединить файлы в один
+        run: |
+          # Создаём пустой итоговый файл
+          > ./download/mobile-whitelist-1.txt
+          
+          # Последовательно добавляем содержимое всех скачанных .txt файлов
+          for file in ./download/*.txt; do
+            if [[ "$file" != "./download/mobile-whitelist-1.txt" ]]; then
+              cat "$file" >> ./download/mobile-whitelist-1.txt
+            fi
+          done
+          echo "Файлы объединены в mobile-whitelist-1.txt"
 
       - name: Клонировать GitVerse
         run: |
@@ -35,7 +59,6 @@ jobs:
           git commit -m "auto update $(date -u)" || echo "Нет изменений"
           git push
 
-      # 👇 ВАЖНО: Самоперезапуск
       - name: Принудительно активировать расписание
         run: |
           echo "re-activate schedule $(date)" >> force.txt
