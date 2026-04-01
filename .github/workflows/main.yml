@@ -1,4 +1,4 @@
-name: Скачивать mobile-whitelist-1.txt на GitVerse
+name: Скачивать и объединять mobile-whitelist-1.txt на GitVerse
 
 on:
   schedule:
@@ -6,36 +6,69 @@ on:
   workflow_dispatch:
 
 jobs:
-  download-and-update:
+  download-and-merge:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Скачать файл с GitHub
-        run: |
-          mkdir -p ./download
-          curl -L -f --fail-early -o ./download/mobile-whitelist-1.txt \
-            "https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt"
-          echo "Файл скачан"
+      # 1. Получаем содержимое вашего GitHub-репозитория (чтобы прочитать sources.txt)
+      - name: Checkout GitHub repository
+        uses: actions/checkout@v4
 
-      - name: Клонировать GitVerse
+      # 2. Скачиваем все файлы по ссылкам и объединяем их в один
+      - name: Скачать источники и объединить в mobile-whitelist-1.txt
+        run: |
+          mkdir -p ./downloads
+
+          echo "# Combined mobile whitelist from multiple sources" > mobile-whitelist-1.txt
+          echo "# Updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> mobile-whitelist-1.txt
+          echo "" >> mobile-whitelist-1.txt
+
+          if [ -f sources.txt ]; then
+            echo "# Источники:" >> mobile-whitelist-1.txt
+            while IFS= read -r url || [ -n "$url" ]; do
+              # Пропускаем пустые строки и комментарии
+              if [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]]; then
+                continue
+              fi
+
+              echo "#   → $url" >> mobile-whitelist-1.txt
+
+              filename=$(basename "$url")
+              if curl -L -f --fail-early -o "./downloads/$filename" "$url"; then
+                echo "" >> mobile-whitelist-1.txt
+                echo "# === НАЧАЛО ФАЙЛА: $url ===" >> mobile-whitelist-1.txt
+                cat "./downloads/$filename" >> mobile-whitelist-1.txt
+                echo "# === КОНЕЦ ФАЙЛА: $url ===" >> mobile-whitelist-1.txt
+                echo "" >> mobile-whitelist-1.txt
+                echo "Успешно скачан: $url"
+              else
+                echo "Ошибка скачивания: $url" >&2
+              fi
+            done < sources.txt
+          else
+            echo "Ошибка: файл sources.txt не найден в репозитории!" >&2
+            exit 1
+          fi
+
+      # 3. Клонируем репозиторий на GitVerse
+      - name: Клонировать GitVerse репозиторий
         run: |
           git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
 
-      - name: Обновить файл
+      # 4. Копируем объединённый файл в GitVerse, коммитим и отправляем
+      - name: Обновить файл на GitVerse
         working-directory: ./repo
         run: |
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
-
-          cp -f ../download/mobile-whitelist-1.txt mobile-whitelist-1.txt
-
-          echo "# Updated $(date -u)" >> mobile-whitelist-1.txt
-
+          
+          cp -f ../mobile-whitelist-1.txt mobile-whitelist-1.txt
+          
           git add mobile-whitelist-1.txt
-          git commit -m "auto update $(date -u)" || echo "Нет изменений"
-          git push
-
-      # 👇 ВАЖНО: Самоперезапуск
-      - name: Принудительно активировать расписание
-        run: |
-          echo "re-activate schedule $(date)" >> force.txt
+          
+          if git commit -m "auto update combined whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
+            git push
+            echo "Изменения успешно отправлены на GitVerse"
+          else
+            echo "Нет изменений в файле mobile-whitelist-1.txt"
+          fi
