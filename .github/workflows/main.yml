@@ -14,7 +14,7 @@ jobs:
         run: |
           mkdir -p ./download
           curl -L -f --fail-early -o ./download/mobile-whitelist-1.txt \
-            "https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt"
+            "https://raw.githubusercontent.com/RKPchannel/RKP_bypass_configs/refs/heads/main/configs/url_work.txt"
           echo "Файл скачан"
 
       - name: Клонировать GitVerse
