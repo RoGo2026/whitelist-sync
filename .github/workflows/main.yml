@@ -10,12 +10,54 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Скачать файл с GitHub
+      - name: Скачать файлы с источников
         run: |
           mkdir -p ./download
-          curl -L -f --fail-early -o ./download/mobile-whitelist-1.txt \
-            "https://raw.githubusercontent.com/RKPchannel/RKP_bypass_configs/refs/heads/main/configs/url_work.txt"
-          echo "Файл скачан"
+          
+          # Список URL для скачивания
+          # Добавляйте или удаляйте строки по необходимости — скрипт адаптируется автоматически
+          urls=(
+            "https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt"
+            "https://raw.githubusercontent.com/FLEXIY0/matryoshka-vpn/main/configs/russia_whitelist.txt"
+            # "https://raw.githubusercontent.com/zieng2/wl/refs/heads/main/vless_lite.txt"
+          )
+          
+          # Скачиваем каждый файл, если список не пуст
+          if [ ${#urls[@]} -gt 0 ]; then
+            for url in "${urls[@]}"; do
+              if [[ -n "$url" && ! "$url" =~ ^# ]]; then
+                filename=$(basename "$url")
+                curl -L -f --fail-early -o "./download/$filename" "$url" && echo "✓ Скачан: $filename" || echo "✗ Ошибка: $url"
+              fi
+            done
+          else
+            echo "⚠ Список URL пуст, скачивание пропущено"
+          fi
+
+      - name: Объединить и отфильтровать файлы
+        run: |
+          # Создаём пустой временный файл
+          > ./download/combined_temp.txt
+          
+          # Обрабатываем все .txt файлы, кроме итоговых и временных
+          for file in ./download/*.txt; do
+            [ -f "$file" ] || continue
+            basename_file=$(basename "$file")
+            case "$basename_file" in
+              mobile-whitelist-1.txt|combined_temp.txt|mobile-whitelist-1.tmp) continue ;;
+            esac
+            cat "$file" >> ./download/combined_temp.txt
+          done
+          
+          # Фильтруем: удаляем комментарии (#) и пустые строки
+          grep -v '^#' ./download/combined_temp.txt 2>/dev/null | grep -v '^$' > ./download/mobile-whitelist-1.txt || true
+          
+          # Удаляем временный файл
+          rm -f ./download/combined_temp.txt
+          
+          # Инфо в лог
+          lines_count=$(wc -l < ./download/mobile-whitelist-1.txt 2>/dev/null || echo 0)
+          echo "✅ Готово. В файле $lines_count рабочих строк"
 
       - name: Клонировать GitVerse
         run: |
@@ -35,7 +77,6 @@ jobs:
           git commit -m "auto update $(date -u)" || echo "Нет изменений"
           git push
 
-      # 👇 ВАЖНО: Самоперезапуск
       - name: Принудительно активировать расписание
         run: |
           echo "re-activate schedule $(date)" >> force.txt
