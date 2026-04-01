@@ -28,18 +28,27 @@ jobs:
             echo "Скачан: $filename"
           done
 
-      - name: Объединить файлы в один
+      - name: Объединить и отфильтровать файлы
         run: |
-          # Создаём пустой итоговый файл
-          > ./download/mobile-whitelist-1.txt
+          # Создаём пустой временный файл
+          > ./download/combined_temp.txt
           
           # Последовательно добавляем содержимое всех скачанных .txt файлов
           for file in ./download/*.txt; do
-            if [[ "$file" != "./download/mobile-whitelist-1.txt" ]]; then
-              cat "$file" >> ./download/mobile-whitelist-1.txt
+            if [[ "$file" != "./download/combined_temp.txt" && "$file" != "./download/mobile-whitelist-1.txt" ]]; then
+              cat "$file" >> ./download/combined_temp.txt
             fi
           done
-          echo "Файлы объединены в mobile-whitelist-1.txt"
+          
+          # Фильтруем: удаляем все строки, начинающиеся с # (комментарии, метаданные)
+          # Оставляем только рабочие ссылки с любыми протоколами
+          grep -v '^#' ./download/combined_temp.txt > ./download/mobile-whitelist-1.txt || true
+          grep -v '^$' ./download/mobile-whitelist-1.txt > ./download/mobile-whitelist-1.tmp && mv ./download/mobile-whitelist-1.tmp ./download/mobile-whitelist-1.txt
+          
+          # Удаляем временный файл
+          rm -f ./download/combined_temp.txt
+          
+          echo "✅ Удалены комментарии, оставлены только рабочие ссылки"
 
       - name: Клонировать GitVerse
         run: |
