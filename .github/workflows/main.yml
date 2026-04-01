@@ -10,45 +10,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Скачать файлы с источников
+      - name: Скачать файл с GitHub
         run: |
           mkdir -p ./download
-          
-          # Список URL для скачивания (3 источника)
-          urls=(
-          
-            https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/refs/heads/main/configs/mobile-whitelist-1.txt
-            
-            )
-          
-          # Скачиваем каждый файл
-          for url in "${urls[@]}"; do
-            filename=$(basename "$url")
-            curl -L -f --fail-early -o "./download/$filename" "$url"
-            echo "Скачан: $filename"
-          done
-
-      - name: Объединить и отфильтровать файлы
-        run: |
-          # Создаём пустой временный файл
-          > ./download/combined_temp.txt
-          
-          # Последовательно добавляем содержимое всех скачанных .txt файлов
-          for file in ./download/*.txt; do
-            if [[ "$file" != "./download/combined_temp.txt" && "$file" != "./download/mobile-whitelist-1.txt" ]]; then
-              cat "$file" >> ./download/combined_temp.txt
-            fi
-          done
-          
-          # Фильтруем: удаляем все строки, начинающиеся с # (комментарии, метаданные)
-          # Оставляем только рабочие ссылки с любыми протоколами
-          grep -v '^#' ./download/combined_temp.txt > ./download/mobile-whitelist-1.txt || true
-          grep -v '^$' ./download/mobile-whitelist-1.txt > ./download/mobile-whitelist-1.tmp && mv ./download/mobile-whitelist-1.tmp ./download/mobile-whitelist-1.txt
-          
-          # Удаляем временный файл
-          rm -f ./download/combined_temp.txt
-          
-          echo "✅ Удалены комментарии, оставлены только рабочие ссылки"
+          curl -L -f --fail-early -o ./download/mobile-whitelist-1.txt \
+            "https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt"
+          echo "Файл скачан"
 
       - name: Клонировать GitVerse
         run: |
@@ -68,6 +35,7 @@ jobs:
           git commit -m "auto update $(date -u)" || echo "Нет изменений"
           git push
 
+      # 👇 ВАЖНО: Самоперезапуск
       - name: Принудительно активировать расписание
         run: |
           echo "re-activate schedule $(date)" >> force.txt
