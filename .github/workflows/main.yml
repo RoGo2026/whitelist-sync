@@ -10,94 +10,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Скачать файлы с источников
+      - name: Скачать файл с GitHub
         run: |
           mkdir -p ./download
-          
-          # Список URL для скачивания
-          urls=(
+          curl -L -f --fail-early -o ./download/mobile-whitelist-1.txt \
             "https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt"
-            # "https://raw.githubusercontent.com/Maskkost93/kizyak-vpn-4.0/refs/heads/main/kizyaktestru.txt"
-            # "https://raw.githubusercontent.com/zieng2/wl/refs/heads/main/vless_lite.txt"
-          )
-          
-          echo "🔍 Начинаем скачивание ${#urls[@]} файлов..."
-          
-          # Скачиваем каждый файл
-          for url in "${urls[@]}"; do
-            if [[ -n "$url" && ! "$url" =~ ^# ]]; then
-              filename=$(basename "$url")
-              echo "⬇️ Скачиваю: $filename"
-              if curl -L -f --fail-early -o "./download/$filename" "$url"; then
-                lines=$(wc -l < "./download/$filename")
-                echo "✓ Скачан: $filename (строк: $lines)"
-                echo "📄 Первые 3 строки файла:"
-                head -n 3 "./download/$filename" | sed 's/^/  /'
-              else
-                echo "✗ Ошибка скачивания: $url"
-              fi
-            fi
-          done
-          
-          # Показываем все скачанные файлы
-          echo ""
-          echo "📁 Файлы в папке download:"
-          ls -la ./download/
-
-      - name: Объединить и отфильтровать файлы
-        run: |
-          echo "🔍 Начинаю объединение и фильтрацию..."
-          
-          # Создаём пустой временный файл
-          > ./download/combined_temp.txt
-          
-          # Обрабатываем все .txt файлы
-          for file in ./download/*.txt; do
-            [ -f "$file" ] || continue
-            basename_file=$(basename "$file")
-            case "$basename_file" in
-              mobile-whitelist-1.txt|combined_temp.txt|mobile-whitelist-1.tmp) 
-                echo " Пропускаю: $basename_file"
-                continue 
-                ;;
-            esac
-            lines=$(wc -l < "$file")
-            echo "📥 Добавляю: $basename_file (строк: $lines)"
-            cat "$file" >> ./download/combined_temp.txt
-          done
-          
-          echo ""
-          echo "📊 Статистика объединённого файла:"
-          total_lines=$(wc -l < ./download/combined_temp.txt)
-          comment_lines=$(grep -c '^#' ./download/combined_temp.txt || echo 0)
-          echo "  Всего строк: $total_lines"
-          echo "  Комментариев (#): $comment_lines"
-          
-          # Фильтруем
-          grep -v '^#' ./download/combined_temp.txt 2>/dev/null | grep -v '^$' > ./download/mobile-whitelist-1.txt || true
-          
-          echo ""
-          echo "📊 После фильтрации:"
-          final_lines=$(wc -l < ./download/mobile-whitelist-1.txt)
-          echo "  Рабочих ссылок: $final_lines"
-          
-          if [ "$final_lines" -gt 0 ]; then
-            echo "✅ Пример первых 5 ссылок:"
-            head -n 5 ./download/mobile-whitelist-1.txt | sed 's/^/  /'
-          else
-            echo "⚠️ ВНИМАНИЕ: Файл пустой после фильтрации!"
-            echo "📄 Содержимое combined_temp.txt (первые 10 строк):"
-            head -n 10 ./download/combined_temp.txt | cat -A | sed 's/^/  /'
-          fi
-          
-          # Удаляем временный файл
-          rm -f ./download/combined_temp.txt
+          echo "Файл скачан"
 
       - name: Клонировать GitVerse
         run: |
-          echo "🔄 Клонирую репозиторий GitVerse..."
           git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
-          echo "✓ Репозиторий склонирован"
 
       - name: Обновить файл
         working-directory: ./repo
@@ -106,22 +28,14 @@ jobs:
           git config user.email "action@noreply.github.com"
 
           cp -f ../download/mobile-whitelist-1.txt mobile-whitelist-1.txt
-          
-          lines=$(wc -l < mobile-whitelist-1.txt)
-          echo "📋 Копирую файл ($lines строк)"
 
           echo "# Updated $(date -u)" >> mobile-whitelist-1.txt
 
           git add mobile-whitelist-1.txt
-          if ! git diff --cached --quiet; then
-            git commit -m "auto update $(date -u)"
-            echo "📤 Отправляю изменения на сервер..."
-            git push
-            echo "✅ Готово!"
-          else
-            echo "ℹ️ Изменений нет"
-          fi
+          git commit -m "auto update $(date -u)" || echo "Нет изменений"
+          git push
 
+      # 👇 ВАЖНО: Самоперезапуск
       - name: Принудительно активировать расписание
         run: |
           echo "re-activate schedule $(date)" >> force.txt
