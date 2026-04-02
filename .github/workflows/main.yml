@@ -1,4 +1,4 @@
-name: Скачивать и объединять mobile-whitelist-1.txt на GitVerse
+name: Скачивать и объединять mobile-whitelist-1.txt на GitVerse (только чистые ссылки)
 
 on:
   schedule:
@@ -13,11 +13,11 @@ jobs:
       - name: Checkout GitHub repository
         uses: actions/checkout@v4
 
-      - name: Скачать источники и создать mobile-whitelist-1.txt
+      - name: Скачать источники и создать чистый mobile-whitelist-1.txt (без комментариев)
         run: |
           mkdir -p ./downloads
 
-          # Создаём пустой итоговый файл
+          # Создаём чистый файл только с ссылками
           > mobile-whitelist-1.txt
 
           if [ ! -f sources.txt ]; then
@@ -25,59 +25,50 @@ jobs:
             exit 1
           fi
 
-          echo "Начинаем обработку источников..."
-
           while IFS= read -r url || [ -n "$url" ]; do
-            # Пропускаем в sources.txt
+            # Пропускаем пустые строки и комментарии в sources.txt
             if [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]]; then
               continue
             fi
 
-            # Очищаем URL
             url=$(echo "$url" | xargs)
 
             if [[ -n "$url" ]]; then
               filename=$(basename "$url")
-              echo "Скачиваем: $url"
-
               if curl -L -f --fail-early -o "./downloads/$filename" "$url"; then
-                # Добавляем ссылки
+                # Добавляем только чистые ссылки (убираем строки с #)
                 grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
-                echo "Успешно добавлено: $url"
+                echo "Успешно добавлено (очищено): $url"
               else
                 echo "Ошибка скачивания: $url" >&2
               fi
             fi
           done < sources.txt
 
-          # Финальная очистка итогового файла
+          # Финальная очистка пустых строк
           sed -i '/^$/d' mobile-whitelist-1.txt
-
-          # Показываем первые 10 строк для проверки
-          echo "=== Первые 10 строк итогового файла ==="
-          head -n 10 mobile-whitelist-1.txt
-          echo "========================================"
-
-          echo "Итоговый файл mobile-whitelist-1.txt успешно создан"
 
       - name: Клонировать GitVerse репозиторий
         run: |
           git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
 
-      - name: Обновить файл на GitVerse
+      - name: Обновить файл на GitVerse (всегда с новым временем)
         working-directory: ./repo
         run: |
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
           
-          # Копируем файл
-          cp -f ../mobile-whitelist-1.txt ./mobile-whitelist-1.txt
+          cp -f ../mobile-whitelist-1.txt mobile-whitelist-1.txt
+          
+          # Добавляем строку с текущим временем в конец файла, чтобы коммит всегда проходил
+          echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> mobile-whitelist-1.txt
           
           git add mobile-whitelist-1.txt
           
+          # Всегда пытаемся сделать коммит (даже если основное содержимое не изменилось)
           if git commit -m "auto update clean whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
             git push
             echo "Изменения успешно отправлены на GitVerse"
           else
-            echo "Нет изменений в файле mobile-whitelist-1.txt"
+            echo "Нет изменений в файле (кроме строки времени)"
           fi
