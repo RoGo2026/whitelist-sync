@@ -3,8 +3,8 @@ name: Cleanup All Workflow Runs
 on:
   workflow_dispatch:  # Запуск вручную
   schedule:
-     - cron: '0 11 * * *'
-       timezone: "Europe/Paris"
+     - cron: '0 */2 * * *'
+       timezone: "Europe/Moscow"
 
 jobs:
   cleanup:
