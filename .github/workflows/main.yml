@@ -28,12 +28,12 @@ jobs:
           echo "Начинаем обработку источников..."
 
           while IFS= read -r url || [ -n "$url" ]; do
-            # Пропускаем пустые строки
+            # Пропускаем в sources.txt
             if [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]]; then
               continue
             fi
 
-            # Очищаем строку
+            # Очищаем URL
             url=$(echo "$url" | xargs)
 
             if [[ -n "$url" ]]; then
@@ -41,19 +41,24 @@ jobs:
               echo "Скачиваем: $url"
 
               if curl -L -f --fail-early -o "./downloads/$filename" "$url"; then
-                # Добавляем содержимое файла
-                cat "./downloads/$filename" >> mobile-whitelist-1.txt
-                echo "Успешно добавлено содержимое из: $url"
+                # Добавляем ссылки
+                grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
+                echo "Успешно добавлено: $url"
               else
                 echo "Ошибка скачивания: $url" >&2
               fi
             fi
           done < sources.txt
 
-          # Финальная очистка
+          # Финальная очистка итогового файла
           sed -i '/^$/d' mobile-whitelist-1.txt
 
-          echo "Итоговый файл mobile-whitelist-1.txt создан"
+          # Показываем первые 10 строк для проверки
+          echo "=== Первые 10 строк итогового файла ==="
+          head -n 10 mobile-whitelist-1.txt
+          echo "========================================"
+
+          echo "Итоговый файл mobile-whitelist-1.txt успешно создан"
 
       - name: Клонировать GitVerse репозиторий
         run: |
@@ -65,6 +70,7 @@ jobs:
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
           
+          # Копируем файл
           cp -f ../mobile-whitelist-1.txt ./mobile-whitelist-1.txt
           
           git add mobile-whitelist-1.txt
