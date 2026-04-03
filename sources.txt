@@ -1,6 +1,7 @@
-https://raw.githubusercontent.com/VPN-cat/VPN/refs/heads/main/configs/VPN-cat-top-100
-https://raw.githubusercontent.com/prominbro/sub/refs/heads/main/212.txt
-https://raw.githubusercontent.com/EtoNeYaProject/etoneyaproject.github.io/refs/heads/main/whitelist
+https://gitflic.ru/project/sigil/my-new-cool-project/blob/raw?file=whitelist&commit=7179e51ebf4526a0623e48f62022f6c2219256fb
+# https://raw.githubusercontent.com/VPN-cat/VPN/refs/heads/main/configs/VPN-cat-top-100
+# https://raw.githubusercontent.com/prominbro/sub/refs/heads/main/212.txt
+# https://raw.githubusercontent.com/EtoNeYaProject/etoneyaproject.github.io/refs/heads/main/whitelist
 # https://raw.githubusercontent.com/FLEXIY0/matryoshka-vpn/refs/heads/main/configs/russia_whitelist.txt
 # https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt
 # https://raw.githubusercontent.com/VP01596/vless-top15/refs/heads/main/All.txt
