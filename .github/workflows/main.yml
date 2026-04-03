@@ -17,7 +17,7 @@ jobs:
         run: |
           mkdir -p ./downloads
 
-          # Создаём чистый файл только с ссылками
+          # Создаём пустой итоговый файл
           > mobile-whitelist-1.txt
 
           if [ ! -f sources.txt ]; then
@@ -25,8 +25,9 @@ jobs:
             exit 1
           fi
 
+          echo "Начинаем обработку обычных источников из sources.txt..."
+
           while IFS= read -r url || [ -n "$url" ]; do
-            # Пропускаем пустые строки и комментарии в sources.txt
             if [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]]; then
               continue
             fi
@@ -36,14 +37,24 @@ jobs:
             if [[ -n "$url" ]]; then
               filename=$(basename "$url")
               if curl -L -f --fail-early -o "./downloads/$filename" "$url"; then
-                # Добавляем только чистые ссылки (убираем строки с #)
                 grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
-                echo "Успешно добавлено (очищено): $url"
+                echo "Успешно добавлено (обычная ссылка): $url"
               else
                 echo "Ошибка скачивания: $url" >&2
               fi
             fi
           done < sources.txt
+
+          # === СПЕЦИАЛЬНАЯ ОБРАБОТКА BASE64-ФАЙЛА С GITFLIC ===
+          echo "Декодируем Base64-файл с GitFlic..."
+          BASE64_RAW_URL="https://gitflic.ru/project/sigil/my-new-cool-project/blob/raw?file=whitelist&branch=master"
+          if curl -L -f --fail-early -o "./downloads/gitflic_base64.txt" "$BASE64_RAW_URL"; then
+            # Декодируем Base64 и добавляем только чистые ссылки
+            base64 --decode "./downloads/gitflic_base64.txt" | grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt
+            echo "Base64-файл с GitFlic успешно декодирован и добавлен"
+          else
+            echo "Ошибка скачивания Base64-файла с GitFlic" >&2
+          fi
 
           # Финальная очистка пустых строк
           sed -i '/^$/d' mobile-whitelist-1.txt
@@ -60,12 +71,11 @@ jobs:
           
           cp -f ../mobile-whitelist-1.txt mobile-whitelist-1.txt
           
-          # Добавляем строку с текущим временем в конец файла, чтобы коммит всегда проходил
+          # Принудительно обновляем время коммита
           echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> mobile-whitelist-1.txt
           
           git add mobile-whitelist-1.txt
           
-          # Всегда пытаемся сделать коммит (даже если основное содержимое не изменилось)
           if git commit -m "auto update clean whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
             git push
             echo "Изменения успешно отправлены на GitVerse"
