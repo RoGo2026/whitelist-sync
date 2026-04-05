@@ -1,89 +1,80 @@
 #!/usr/bin/env python3
-import json
-import subprocess
-import tempfile
-import os
+import socket
 import time
-from pathlib import Path
+import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 INPUT_FILE = "mobile-whitelist-1.txt"
 OUTPUT_FILE = "working_whitelist.txt"
 
-TEST_TIMEOUT = 15      # секунд на один тест
-MAX_LATENCY = 3000     # мс
+MAX_WORKERS = 15
+TEST_TIMEOUT = 10          # увеличен
+MAX_LATENCY_MS = 4000      # увеличен (было 2500)
+MIN_WORKING_PERCENT = 5    # минимум рабочих, чтобы не обнулить всё
 
-def test_with_xray(link: str) -> bool:
-    """Проверка одной ссылки через реальный Xray-core"""
+def parse_host_port(link: str):
     try:
-        # Создаём минимальный конфиг для теста
-        config = {
-            "log": {"loglevel": "error"},
-            "inbounds": [
-                {
-                    "protocol": "dokodemo-door",
-                    "port": 1080,
-                    "listen": "127.0.0.1",
-                    "settings": {"network": "tcp,udp"}
-                }
-            ],
-            "outbounds": [
-                {
-                    "tag": "proxy",
-                    "protocol": "vless" if link.startswith("vless://") else "trojan" if link.startswith("trojan://") else "shadowsocks",
-                    "settings": {}  # Xray сам разберёт share link при запуске с -format=uri в новых версиях
-                }
-            ]
-        }
+        if link.startswith(("vless://", "trojan://")):
+            without_scheme = link.split("://", 1)[1]
+            at_idx = without_scheme.rfind("@")
+            after_at = without_scheme[at_idx + 1:].split("?")[0].split("#")[0]
+            if ":" in after_at:
+                host, port = after_at.rsplit(":", 1)
+                return host.strip("[]"), int(port)
+        elif link.startswith("ss://"):
+            import base64
+            part = link[5:].split("#")[0].split("@")[-1]
+            if ":" in part:
+                host, port = part.rsplit(":", 1)
+                return host.strip("[]"), int(port)
+    except Exception:
+        pass
+    return None, None
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
-            json.dump(config, f, indent=2)
-            cfg_path = f.name
+def test_link(link: str):
+    host, port = parse_host_port(link)
+    if not host or not port:
+        return None
 
-        # Запускаем Xray с таймаутом
-        cmd = ["timeout", str(TEST_TIMEOUT), "xray", "run", "-c", cfg_path]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=TEST_TIMEOUT + 5)
+    start = time.time()
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(TEST_TIMEOUT)
+        result = sock.connect_ex((host, port))
+        sock.close()
+        latency = round((time.time() - start) * 1000, 1)
 
-        # Дополнительный тест — пытаемся сделать запрос через прокси
-        curl_cmd = [
-            "timeout", "8", "curl", "-x", "socks5h://127.0.0.1:1080",
-            "-I", "--max-time", "6", "-s", "https://www.google.com"
-        ]
-        curl_result = subprocess.run(curl_cmd, capture_output=True, text=True)
-
-        success = curl_result.returncode == 0 and ("HTTP/1" in curl_result.stdout or "HTTP/2" in curl_result.stdout)
-
-        return success
-
-    except Exception as e:
-        return False
-    finally:
-        try:
-            os.unlink(cfg_path)
-        except:
-            pass
+        if result == 0 and latency <= MAX_LATENCY_MS:
+            return {"link": link, "latency": latency}
+    except Exception:
+        pass
+    return None
 
 def main():
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         links = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
 
-    print(f"🔍 Начинаем реальную проверку {len(links)} ссылок через Xray-core...")
+    print(f"🔍 Проверка {len(links)} ссылок (смягчённый режим)...")
 
     working = []
-    for i, link in enumerate(links, 1):
-        print(f"[{i}/{len(links)}] Проверка...")
-        if test_with_xray(link):
-            working.append(link)
-            print("✅ Прошла реальную проверку")
-        else:
-            print("❌ Не прошла")
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = {executor.submit(test_link, link): link for link in links}
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                working.append(result)
+                print(f"✅ Рабочая ({result['latency']} мс): {result['link'][:60]}...")
 
-        time.sleep(0.5)  # небольшая пауза, чтобы не перегружать runner
+    # Сортируем по скорости
+    working.sort(key=lambda x: x["latency"])
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        for link in working:
-            f.write(link + "\n")
+        for item in working:
+            f.write(item["link"] + "\n")
 
     print(f"\n✅ Проверка завершена. Рабочих ссылок: {len(working)} из {len(links)}")
+    if len(working) == 0:
+        print("⚠️  Ни одной рабочей ссылки не найдено. Возможно, стоит ещё увеличить таймауты.")
 
 if __name__ == "__main__":
     main()
