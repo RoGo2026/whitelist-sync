@@ -7,15 +7,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 INPUT_FILE = "mobile-whitelist-1.txt"
 OUTPUT_FILE = "working_whitelist.txt"
 
-# ==================== НАСТРОЙКИ ====================
-MAX_WORKERS = 7
-TCP_TIMEOUT = 7           # таймаут для TCP-проверки (открытие порта)
-HTTP_TIMEOUT = 5          # ← новый параметр: таймаут для тестирования сайта
-MAX_LATENCY_MS = 3000     # максимальная задержка TCP
+MAX_WORKERS = 5
+TCP_TIMEOUT = 5
+HTTP_TIMEOUT = 5
+MAX_LATENCY_MS = 3000
 MAX_HTTP_ATTEMPTS = 2
-TEST_URL = "https://cp.cloudflare.com"
-MIN_WORKING_PERCENT = 5
-# ===================================================
 
 def parse_host_port(link: str):
     """Извлекает host и port из ссылки"""
@@ -38,7 +34,7 @@ def parse_host_port(link: str):
     return None, None
 
 def test_tcp(link: str):
-    """TCP-проверка"""
+    """Первый этап — TCP проверка"""
     host, port = parse_host_port(link)
     if not host or not port:
         return None
@@ -58,14 +54,14 @@ def test_tcp(link: str):
     return None
 
 def test_http(link_info: dict) -> bool:
-    """HTTP-тест сайта с отдельным таймаутом"""
+    """Второй этап — максимально мягкий HTTP-тест (3 попытки)"""
     for attempt in range(1, MAX_HTTP_ATTEMPTS + 1):
         try:
             cmd = [
-                "timeout", str(HTTP_TIMEOUT + 3),
+                "timeout", str(HTTP_TIMEOUT),
                 "curl", "-x", f"socks5h://{link_info['host']}:{link_info['port']}",
-                "-I", "--max-time", str(HTTP_TIMEOUT), "-s", "-k", "-o", "/dev/null",
-                "-w", "%{http_code}", TEST_URL
+                "-I", "--max-time", "8", "-s", "-k", "-o", "/dev/null",
+                "-w", "%{http_code}", "https://www.cloudflare.com"
             ]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=HTTP_TIMEOUT + 5)
             
@@ -75,11 +71,10 @@ def test_http(link_info: dict) -> bool:
                 
             print(f"   Попытка {attempt}/{MAX_HTTP_ATTEMPTS} — код {http_code}")
             
-        except Exception:
-            print(f"   Попытка {attempt}/{MAX_HTTP_ATTEMPTS} — ошибка таймаута")
+        except Exception as e:
+            print(f"   Попытка {attempt}/{MAX_HTTP_ATTEMPTS} — ошибка")
         
-        if attempt < MAX_HTTP_ATTEMPTS:
-            time.sleep(0.8)
+        time.sleep(1.2)  # пауза между попытками
     
     return False
 
@@ -87,9 +82,7 @@ def main():
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         links = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
 
-    print(f"🔍 Запуск проверки (режим: повышенное качество)")
-    print(f"Тестовый сайт: {TEST_URL}")
-    print(f"TCP_TIMEOUT = {TCP_TIMEOUT} сек | HTTP_TIMEOUT = {HTTP_TIMEOUT} сек | MAX_LATENCY_MS = {MAX_LATENCY_MS} мс")
+    print(f"🔍 Запуск проверки: TCP + максимально мягкий HTTP-тест")
     print(f"Всего ссылок: {len(links)}\n")
 
     # Этап 1: TCP проверка
@@ -104,16 +97,16 @@ def main():
 
     print(f"\nПорт открыт у {len(candidates)} ссылок. Начинаем HTTP-тест...\n")
 
-    # Этап 2: HTTP-тест
+    # Этап 2: Мягкий HTTP-тест
     working = []
     for i, candidate in enumerate(candidates, 1):
-        print(f"[{i}/{len(candidates)}] Тест {TEST_URL} → {candidate['host']}:{candidate['port']}")
+        print(f"[{i}/{len(candidates)}] HTTP-тест {candidate['host']}:{candidate['port']}")
         if test_http(candidate):
             working.append(candidate)
-            print("   → УСПЕШНО\n")
+            print("   → УСПЕШНО ПРОШЁЛ\n")
         else:
-            print("   → Не прошёл\n")
-        time.sleep(0.5)
+            print("   → Не прошёл HTTP-тест\n")
+        time.sleep(0.6)
 
     # Сортируем по скорости
     working.sort(key=lambda x: x["latency"])
@@ -122,14 +115,9 @@ def main():
         for item in working:
             f.write(item["link"] + "\n")
 
-    percent = round(len(working) / len(links) * 100, 1) if links else 0
-
-    print(f"\n{'='*75}")
-    print(f"ФИНАЛЬНЫЙ РЕЗУЛЬТАТ: {len(working)} рабочих ссылок из {len(links)} ({percent}%)")
-    print(f"{'='*75}")
-
-    if percent < MIN_WORKING_PERCENT:
-        print(f"⚠️  ВНИМАНИЕ: Процент рабочих ссылок ({percent}%) ниже минимального ({MIN_WORKING_PERCENT}%)")
+    print(f"\n{'='*65}")
+    print(f"ФИНАЛЬНЫЙ РЕЗУЛЬТАТ: {len(working)} рабочих ссылок из {len(links)}")
+    print(f"{'='*65}")
 
 if __name__ == "__main__":
     main()
