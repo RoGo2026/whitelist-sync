@@ -9,9 +9,9 @@ OUTPUT_FILE = "working_whitelist.txt"
 
 # ==================== НАСТРОЙКИ ====================
 MAX_WORKERS = 7
-TCP_TIMEOUT = 5           # таймаут для TCP-проверки (открытие порта)
+TCP_TIMEOUT = 7           # таймаут для TCP-проверки (открытие порта)
 HTTP_TIMEOUT = 5          # ← новый параметр: таймаут для тестирования сайта
-MAX_LATENCY_MS = 2000     # максимальная задержка TCP
+MAX_LATENCY_MS = 3000     # максимальная задержка TCP
 MAX_HTTP_ATTEMPTS = 2
 TEST_URL = "https://cp.cloudflare.com"
 MIN_WORKING_PERCENT = 5
