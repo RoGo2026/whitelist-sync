@@ -8,10 +8,10 @@ INPUT_FILE = "mobile-whitelist-1.txt"
 OUTPUT_FILE = "working_whitelist.txt"
 
 MAX_WORKERS = 12
-TCP_TIMEOUT = 10
-HTTP_TIMEOUT = 12
+TCP_TIMEOUT = 8          # уменьшено
+HTTP_TIMEOUT = 10        # уменьшено
 MAX_LATENCY_MS = 4500
-MAX_HTTP_ATTEMPTS = 3
+MAX_HTTP_ATTEMPTS = 2    # уменьшено до двух
 
 def parse_host_port(link: str):
     """Извлекает host и port из ссылки"""
@@ -54,27 +54,30 @@ def test_tcp(link: str):
     return None
 
 def test_http(link_info: dict) -> bool:
-    """Второй этап — максимально мягкий HTTP-тест (3 попытки)"""
+    """Второй этап — HTTP-тест через YouTube (максимум 2 попытки)"""
     for attempt in range(1, MAX_HTTP_ATTEMPTS + 1):
         try:
             cmd = [
                 "timeout", str(HTTP_TIMEOUT),
                 "curl", "-x", f"socks5h://{link_info['host']}:{link_info['port']}",
                 "-I", "--max-time", "8", "-s", "-k", "-o", "/dev/null",
-                "-w", "%{http_code}", "https://www.cloudflare.com"
+                "-w", "%{http_code}", "https://www.youtube.com"
             ]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=HTTP_TIMEOUT + 5)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=HTTP_TIMEOUT + 4)
             
             http_code = result.stdout.strip()
+            
+            # Принимаем 200, 301, 302, 403 как успешные
             if http_code in ("200", "301", "302", "403", "000"):
                 return True
                 
-            print(f"   Попытка {attempt}/{MAX_HTTP_ATTEMPTS} — код {http_code}")
+            print(f"   Попытка {attempt}/2 — код {http_code}")
             
-        except Exception as e:
-            print(f"   Попытка {attempt}/{MAX_HTTP_ATTEMPTS} — ошибка")
+        except Exception:
+            print(f"   Попытка {attempt}/2 — ошибка соединения")
         
-        time.sleep(1.2)  # пауза между попытками
+        if attempt < MAX_HTTP_ATTEMPTS:
+            time.sleep(1.0)
     
     return False
 
@@ -82,7 +85,7 @@ def main():
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         links = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
 
-    print(f"🔍 Запуск проверки: TCP + максимально мягкий HTTP-тест")
+    print(f"🔍 Запуск проверки: TCP + HTTP-тест (YouTube)")
     print(f"Всего ссылок: {len(links)}\n")
 
     # Этап 1: TCP проверка
@@ -95,18 +98,18 @@ def main():
                 candidates.append(result)
                 print(f"✅ TCP OK ({result['latency']} мс) — {result['host']}:{result['port']}")
 
-    print(f"\nПорт открыт у {len(candidates)} ссылок. Начинаем HTTP-тест...\n")
+    print(f"\nПорт открыт у {len(candidates)} ссылок. Начинаем HTTP-тест через YouTube...\n")
 
-    # Этап 2: Мягкий HTTP-тест
+    # Этап 2: HTTP-тест
     working = []
     for i, candidate in enumerate(candidates, 1):
-        print(f"[{i}/{len(candidates)}] HTTP-тест {candidate['host']}:{candidate['port']}")
+        print(f"[{i}/{len(candidates)}] Тест YouTube → {candidate['host']}:{candidate['port']}")
         if test_http(candidate):
             working.append(candidate)
-            print("   → УСПЕШНО ПРОШЁЛ\n")
+            print("   → УСПЕШНО\n")
         else:
-            print("   → Не прошёл HTTP-тест\n")
-        time.sleep(0.6)
+            print("   → Не прошёл\n")
+        time.sleep(0.5)
 
     # Сортируем по скорости
     working.sort(key=lambda x: x["latency"])
