@@ -1,4 +1,5 @@
-https://raw.githubusercontent.com/VP01596/vless-top15/refs/heads/main/All.txt
+https://raw.githubusercontent.com/AirLinkVPN/AirLinkVPN.github.io/refs/heads/main/1.txt
+# https://raw.githubusercontent.com/VP01596/vless-top15/refs/heads/main/All.txt
 # https://raw.githubusercontent.com/FLEXIY0/matryoshka-vpn/refs/heads/main/configs/russia_whitelist.txt
 # https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt
 # https://white-lists.vercel.app/api/filter?code=RU
