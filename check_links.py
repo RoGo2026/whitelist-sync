@@ -7,13 +7,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 INPUT_FILE = "mobile-whitelist-1.txt"
 OUTPUT_FILE = "working_whitelist.txt"
 
-MAX_WORKERS = 10
-TCP_TIMEOUT = 8
-HTTP_TIMEOUT = 10
-MAX_LATENCY_MS = 3500
+MAX_WORKERS = 12
+TCP_TIMEOUT = 10
+HTTP_TIMEOUT = 12
+MAX_LATENCY_MS = 4500
+MAX_HTTP_ATTEMPTS = 3
 
 def parse_host_port(link: str):
-    """Извлекает host и port из vless, trojan или ss ссылки"""
+    """Извлекает host и port из ссылки"""
     try:
         if link.startswith(("vless://", "trojan://")):
             without_scheme = link.split("://", 1)[1]
@@ -33,7 +34,7 @@ def parse_host_port(link: str):
     return None, None
 
 def test_tcp(link: str):
-    """Первый этап — быстрый TCP тест"""
+    """Первый этап — TCP проверка"""
     host, port = parse_host_port(link)
     if not host or not port:
         return None
@@ -52,32 +53,37 @@ def test_tcp(link: str):
         pass
     return None
 
-def test_http(link_info: dict):
-    """Второй этап — HTTP тест через socks5"""
-    try:
-        cmd = [
-            "timeout", str(HTTP_TIMEOUT),
-            "curl", "-x", f"socks5h://{link_info['host']}:{link_info['port']}",
-            "-I", "--max-time", "7", "-s", "-o", "/dev/null", "-w", "%{http_code}",
-            "https://www.cloudflare.com"
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=HTTP_TIMEOUT + 3)
+def test_http(link_info: dict) -> bool:
+    """Второй этап — максимально мягкий HTTP-тест (3 попытки)"""
+    for attempt in range(1, MAX_HTTP_ATTEMPTS + 1):
+        try:
+            cmd = [
+                "timeout", str(HTTP_TIMEOUT),
+                "curl", "-x", f"socks5h://{link_info['host']}:{link_info['port']}",
+                "-I", "--max-time", "8", "-s", "-k", "-o", "/dev/null",
+                "-w", "%{http_code}", "https://www.cloudflare.com"
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=HTTP_TIMEOUT + 5)
+            
+            http_code = result.stdout.strip()
+            if http_code in ("200", "301", "302", "403", "000"):
+                return True
+                
+            print(f"   Попытка {attempt}/{MAX_HTTP_ATTEMPTS} — код {http_code}")
+            
+        except Exception as e:
+            print(f"   Попытка {attempt}/{MAX_HTTP_ATTEMPTS} — ошибка")
         
-        http_code = result.stdout.strip()
-        success = http_code in ("200", "301", "302", "403")  # 403 тоже часто проходит у рабочих серверов
-        
-        if success:
-            return link_info["link"]
-        return None
-    except Exception:
-        return None
+        time.sleep(1.2)  # пауза между попытками
+    
+    return False
 
 def main():
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         links = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
 
-    print(f"🔍 Запуск комбинированной проверки: TCP + HTTP")
-    print(f"Всего ссылок для проверки: {len(links)}\n")
+    print(f"🔍 Запуск проверки: TCP + максимально мягкий HTTP-тест")
+    print(f"Всего ссылок: {len(links)}\n")
 
     # Этап 1: TCP проверка
     candidates = []
@@ -87,33 +93,31 @@ def main():
             result = future.result()
             if result:
                 candidates.append(result)
-                print(f"✅ TCP прошёл ({result['latency']} мс) — {result['host']}:{result['port']}")
+                print(f"✅ TCP OK ({result['latency']} мс) — {result['host']}:{result['port']}")
 
-    print(f"\nПорт открыт у {len(candidates)} ссылок. Запускаем HTTP-тест...\n")
+    print(f"\nПорт открыт у {len(candidates)} ссылок. Начинаем HTTP-тест...\n")
 
-    # Этап 2: HTTP проверка
+    # Этап 2: Мягкий HTTP-тест
     working = []
     for i, candidate in enumerate(candidates, 1):
-        print(f"[{i}/{len(candidates)}] HTTP-тест: {candidate['host']}:{candidate['port']}")
-        result = test_http(candidate)
-        if result:
-            working.append(result)
-            print("   → УСПЕШНО\n")
+        print(f"[{i}/{len(candidates)}] HTTP-тест {candidate['host']}:{candidate['port']}")
+        if test_http(candidate):
+            working.append(candidate)
+            print("   → УСПЕШНО ПРОШЁЛ\n")
         else:
             print("   → Не прошёл HTTP-тест\n")
-        time.sleep(0.4)  # небольшая пауза
+        time.sleep(0.6)
 
-    # Сортируем рабочие ссылки по latency
-    working_with_latency = [c for c in candidates if c["link"] in working]
-    working_with_latency.sort(key=lambda x: x["latency"])
+    # Сортируем по скорости
+    working.sort(key=lambda x: x["latency"])
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        for item in working_with_latency:
+        for item in working:
             f.write(item["link"] + "\n")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'='*65}")
     print(f"ФИНАЛЬНЫЙ РЕЗУЛЬТАТ: {len(working)} рабочих ссылок из {len(links)}")
-    print(f"{'='*60}")
+    print(f"{'='*65}")
 
 if __name__ == "__main__":
     main()
