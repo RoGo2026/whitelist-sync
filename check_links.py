@@ -9,8 +9,8 @@ OUTPUT_FILE = "working_whitelist.txt"
 
 MAX_WORKERS = 10
 TEST_TIMEOUT = 5 
-MAX_LATENCY_MS = 2500 
-MIN_WORKING_PERCENT = 5 
+MAX_LATENCY_MS = 1500 
+MIN_WORKING_PERCENT = 95 
 
 def parse_host_port(link: str):
     try:
