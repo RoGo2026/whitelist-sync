@@ -7,11 +7,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 INPUT_FILE = "mobile-whitelist-1.txt"
 OUTPUT_FILE = "working_whitelist.txt"
 
-MAX_WORKERS = 5
+# ==================== НАСТРОЙКИ ====================
+MAX_WORKERS = 7
 TCP_TIMEOUT = 5
-HTTP_TIMEOUT = 5
-MAX_LATENCY_MS = 3000
+HTTP_TIMEOUT = 7          # увеличил специально для HTTP-теста
+MAX_LATENCY_MS = 2500     # более строгое качество
 MAX_HTTP_ATTEMPTS = 2
+TEST_URL = "https://cp.cloudflare.com"
+# ===================================================
 
 def parse_host_port(link: str):
     """Извлекает host и port из ссылки"""
@@ -34,7 +37,7 @@ def parse_host_port(link: str):
     return None, None
 
 def test_tcp(link: str):
-    """Первый этап — TCP проверка"""
+    """TCP-проверка"""
     host, port = parse_host_port(link)
     if not host or not port:
         return None
@@ -54,16 +57,19 @@ def test_tcp(link: str):
     return None
 
 def test_http(link_info: dict) -> bool:
-    """Второй этап — максимально мягкий HTTP-тест (3 попытки)"""
+    """HTTP-тест на cp.cloudflare.com"""
     for attempt in range(1, MAX_HTTP_ATTEMPTS + 1):
         try:
             cmd = [
-                "timeout", str(HTTP_TIMEOUT),
-                "curl", "-x", f"socks5h://{link_info['host']}:{link_info['port']}",
-                "-I", "--max-time", "8", "-s", "-k", "-o", "/dev/null",
-                "-w", "%{http_code}", "https://www.cloudflare.com"
+                "timeout", str(HTTP_TIMEOUT + 4),
+                "curl", 
+                "-x", f"socks5h://{link_info['host']}:{link_info['port']}",
+                "-I", "--max-time", str(HTTP_TIMEOUT), 
+                "-s", "-k", "-o", "/dev/null",
+                "-w", "%{http_code}", 
+                TEST_URL
             ]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=HTTP_TIMEOUT + 5)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=HTTP_TIMEOUT + 6)
             
             http_code = result.stdout.strip()
             if http_code in ("200", "301", "302", "403", "000"):
@@ -71,10 +77,11 @@ def test_http(link_info: dict) -> bool:
                 
             print(f"   Попытка {attempt}/{MAX_HTTP_ATTEMPTS} — код {http_code}")
             
-        except Exception as e:
+        except Exception:
             print(f"   Попытка {attempt}/{MAX_HTTP_ATTEMPTS} — ошибка")
         
-        time.sleep(1.2)  # пауза между попытками
+        if attempt < MAX_HTTP_ATTEMPTS:
+            time.sleep(1.0)
     
     return False
 
@@ -82,10 +89,10 @@ def main():
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         links = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
 
-    print(f"🔍 Запуск проверки: TCP + максимально мягкий HTTP-тест")
+    print(f"🔍 Запуск проверки: TCP + HTTP (cp.cloudflare.com)")
     print(f"Всего ссылок: {len(links)}\n")
 
-    # Этап 1: TCP проверка
+    # Этап 1: TCP
     candidates = []
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {executor.submit(test_tcp, link): link for link in links}
@@ -97,27 +104,26 @@ def main():
 
     print(f"\nПорт открыт у {len(candidates)} ссылок. Начинаем HTTP-тест...\n")
 
-    # Этап 2: Мягкий HTTP-тест
+    # Этап 2: HTTP
     working = []
     for i, candidate in enumerate(candidates, 1):
-        print(f"[{i}/{len(candidates)}] HTTP-тест {candidate['host']}:{candidate['port']}")
+        print(f"[{i}/{len(candidates)}] Тест {TEST_URL} → {candidate['host']}:{candidate['port']}")
         if test_http(candidate):
             working.append(candidate)
-            print("   → УСПЕШНО ПРОШЁЛ\n")
+            print("   → УСПЕШНО\n")
         else:
-            print("   → Не прошёл HTTP-тест\n")
+            print("   → Не прошёл\n")
         time.sleep(0.6)
 
-    # Сортируем по скорости
     working.sort(key=lambda x: x["latency"])
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         for item in working:
             f.write(item["link"] + "\n")
 
-    print(f"\n{'='*65}")
+    print(f"\n{'='*70}")
     print(f"ФИНАЛЬНЫЙ РЕЗУЛЬТАТ: {len(working)} рабочих ссылок из {len(links)}")
-    print(f"{'='*65}")
+    print(f"{'='*70}")
 
 if __name__ == "__main__":
     main()
