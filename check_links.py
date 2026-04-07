@@ -6,12 +6,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 INPUT_FILE = "mobile-whitelist-1.txt"
 OUTPUT_FILE = "working_whitelist.txt"
 
-# ==================== БЫСТРЫЕ НАСТРОЙКИ ====================
-MAX_WORKERS = 10
-HTTP_TIMEOUT = 4          # очень жёстко
-MAX_HTTP_ATTEMPTS = 1     # только 1 попытка
+# ==================== НАСТРОЙКИ ====================
+MAX_WORKERS = 6
+HTTP_TIMEOUT = 5          # жёстко
+MAX_HTTP_ATTEMPTS = 1     # только одна попытка
 TEST_URL = "https://1.1.1.1"
-# ========================================================
+# ===================================================
 
 def parse_host_port(link: str):
     try:
@@ -39,13 +39,15 @@ def test_link(link: str) -> bool:
 
     try:
         cmd = [
-            "timeout", str(HTTP_TIMEOUT + 2),
-            "curl", "-x", f"socks5h://{host}:{port}",
+            "timeout", "7",                     # жёсткий внешний таймаут
+            "curl", 
+            "-x", f"socks5h://{host}:{port}",
             "-I", "--max-time", str(HTTP_TIMEOUT),
             "-s", "-k", "-o", "/dev/null",
-            "-w", "%{http_code}", TEST_URL
+            "-w", "%{http_code}", 
+            TEST_URL
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=HTTP_TIMEOUT + 3)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
         http_code = result.stdout.strip()
         return http_code in ("200", "301", "302", "403", "000")
     except Exception:
@@ -55,7 +57,7 @@ def main():
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         links = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
 
-    print(f"🔍 Быстрая проверка (только HTTP, timeout = {HTTP_TIMEOUT} сек, 1 попытка)")
+    print(f"🔍 Быстрая проверка (timeout = {HTTP_TIMEOUT} сек, 1 попытка)")
     print(f"Всего ссылок: {len(links)}\n")
 
     working = []
