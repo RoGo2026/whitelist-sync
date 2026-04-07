@@ -8,7 +8,7 @@ OUTPUT_FILE = "working_whitelist.txt"
 
 # ==================== НАСТРОЙКИ ====================
 MAX_WORKERS = 8
-HTTP_TIMEOUT = 7 
+HTTP_TIMEOUT = 2 
 MAX_HTTP_ATTEMPTS = 2
 TEST_URL = "https://1.1.1.1"
 # ===================================================
