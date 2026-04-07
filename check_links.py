@@ -10,7 +10,7 @@ OUTPUT_FILE = "working_whitelist.txt"
 MAX_WORKERS = 2
 HTTP_TIMEOUT = 3
 MAX_HTTP_ATTEMPTS = 2
-TEST_URL = "https://1.1.1.1"
+TEST_URL = "https://youtube.com"
 # ===================================================
 
 def test_link(link: str) -> bool:
