@@ -1,88 +1,81 @@
 #!/usr/bin/env python3
 import subprocess
 import time
-import json
-import tempfile
-import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 INPUT_FILE = "mobile-whitelist-1.txt"
 OUTPUT_FILE = "working_whitelist.txt"
 
-TEST_TIMEOUT = 3
-MAX_WORKERS = 3 
+# ==================== БЫСТРЫЕ НАСТРОЙКИ ====================
+MAX_WORKERS = 10
+HTTP_TIMEOUT = 4          # очень жёстко
+MAX_HTTP_ATTEMPTS = 1     # только 1 попытка
+TEST_URL = "https://1.1.1.1"
+# ========================================================
 
-def test_with_xray(link: str) -> bool:
-    """Реальная проверка через Xray-core"""
-    config_path = None
+def parse_host_port(link: str):
     try:
-        # Создаём минимальный конфиг для теста
-        config = {
-            "log": {"loglevel": "none"},
-            "inbounds": [
-                {
-                    "protocol": "socks",
-                    "port": 1080,
-                    "listen": "127.0.0.1",
-                    "settings": {"udp": True}
-                }
-            ],
-            "outbounds": [
-                {
-                    "tag": "proxy",
-                    "protocol": "freedom"  # будет заменено Xray при использовании share link
-                }
-            ]
-        }
+        if link.startswith(("vless://", "trojan://")):
+            without_scheme = link.split("://", 1)[1]
+            at_idx = without_scheme.rfind("@")
+            after_at = without_scheme[at_idx + 1:].split("?")[0].split("#")[0]
+            if ":" in after_at:
+                host, port = after_at.rsplit(":", 1)
+                return host.strip("[]"), int(port)
+        elif link.startswith("ss://"):
+            part = link[5:].split("#")[0].split("@")[-1]
+            if ":" in part:
+                host, port = part.rsplit(":", 1)
+                return host.strip("[]"), int(port)
+    except Exception:
+        pass
+    return None, None
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as f:
-            json.dump(config, f, indent=2)
-            config_path = f.name
+def test_link(link: str) -> bool:
+    info = parse_host_port(link)
+    if not info:
+        return False
+    host, port = info
 
-        # Запускаем Xray с таймаутом
-        xray_cmd = ["timeout", str(TEST_TIMEOUT), "xray", "run", "-c", config_path]
-        subprocess.run(xray_cmd, capture_output=True, timeout=TEST_TIMEOUT + 3)
-
-        # Проверяем реальную работу через curl
-        curl_cmd = [
-            "timeout", "8",
-            "curl", "-x", "socks5h://127.0.0.1:1080",
-            "-I", "--max-time", "6", "-s", "-k",
-            "https://1.1.1.1"
+    try:
+        cmd = [
+            "timeout", str(HTTP_TIMEOUT + 2),
+            "curl", "-x", f"socks5h://{host}:{port}",
+            "-I", "--max-time", str(HTTP_TIMEOUT),
+            "-s", "-k", "-o", "/dev/null",
+            "-w", "%{http_code}", TEST_URL
         ]
-        result = subprocess.run(curl_cmd, capture_output=True, text=True, timeout=10)
-
-        return result.returncode == 0
-
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=HTTP_TIMEOUT + 3)
+        http_code = result.stdout.strip()
+        return http_code in ("200", "301", "302", "403", "000")
     except Exception:
         return False
-    finally:
-        if config_path and os.path.exists(config_path):
-            os.unlink(config_path)
 
 def main():
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         links = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
 
-    print(f"🔍 Запуск проверки через Xray-core")
+    print(f"🔍 Быстрая проверка (только HTTP, timeout = {HTTP_TIMEOUT} сек, 1 попытка)")
     print(f"Всего ссылок: {len(links)}\n")
 
     working = []
-    for i, link in enumerate(links, 1):
-        print(f"[{i}/{len(links)}] Проверка...")
-        if test_with_xray(link):
-            working.append(link)
-            print("   ✅ РАБОЧАЯ")
-        else:
-            print("   ❌ Не прошла")
-        time.sleep(0.7)  # пауза для стабильности
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = {executor.submit(test_link, link): link for link in links}
+        for future in as_completed(futures):
+            link = futures[future]
+            if future.result():
+                working.append(link)
+                print(f"✅")
+            else:
+                print(f"❌")
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         for link in working:
             f.write(link + "\n")
 
-    print(f"\n{'='*70}")
-    print(f"ФИНАЛЬНЫЙ РЕЗУЛЬТАТ: {len(working)} рабочих ссылок из {len(links)}")
-    print(f"{'='*70}")
+    print(f"\n{'='*60}")
+    print(f"ГОТОВО: {len(working)} рабочих из {len(links)}")
+    print(f"{'='*60}")
 
 if __name__ == "__main__":
     main()
