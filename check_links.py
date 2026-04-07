@@ -8,8 +8,8 @@ import os
 INPUT_FILE = "mobile-whitelist-1.txt"
 OUTPUT_FILE = "working_whitelist.txt"
 
-TEST_TIMEOUT = 12
-MAX_WORKERS = 5   # Xray тяжёлый, не стоит ставить много параллельно
+TEST_TIMEOUT = 3
+MAX_WORKERS = 3 
 
 def test_with_xray(link: str) -> bool:
     """Реальная проверка через Xray-core"""
