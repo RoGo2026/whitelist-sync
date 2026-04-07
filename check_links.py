@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
-import subprocess
+import socket
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 INPUT_FILE = "mobile-whitelist-1.txt"
 OUTPUT_FILE = "working_whitelist.txt"
 
-# ==================== НАСТРОЙКИ ====================
-MAX_WORKERS = 6
-HTTP_TIMEOUT = 5          # жёстко
-MAX_HTTP_ATTEMPTS = 1     # только одна попытка
-TEST_URL = "https://1.1.1.1"
-# ===================================================
+# ==================== МАКСИМАЛЬНО ЖЁСТКИЕ НАСТРОЙКИ ====================
+MAX_WORKERS = 10
+TCP_TIMEOUT = 2 
+MAX_LATENCY_MS = 1500 
+# =====================================================================
 
 def parse_host_port(link: str):
     try:
@@ -31,53 +30,55 @@ def parse_host_port(link: str):
         pass
     return None, None
 
-def test_link(link: str) -> bool:
+def test_link(link: str):
     info = parse_host_port(link)
     if not info:
-        return False
+        return None
     host, port = info
 
+    start = time.time()
     try:
-        cmd = [
-            "timeout", "7",                     # жёсткий внешний таймаут
-            "curl", 
-            "-x", f"socks5h://{host}:{port}",
-            "-I", "--max-time", str(HTTP_TIMEOUT),
-            "-s", "-k", "-o", "/dev/null",
-            "-w", "%{http_code}", 
-            TEST_URL
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
-        http_code = result.stdout.strip()
-        return http_code in ("200", "301", "302", "403", "000")
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(TCP_TIMEOUT)
+        result = sock.connect_ex((host, port))
+        sock.close()
+        latency = round((time.time() - start) * 1000, 1)
+
+        # Очень жёсткое условие
+        if result == 0 and latency <= MAX_LATENCY_MS:
+            return {"link": link, "latency": latency}
     except Exception:
-        return False
+        pass
+    return None
 
 def main():
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         links = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
 
-    print(f"🔍 Быстрая проверка (timeout = {HTTP_TIMEOUT} сек, 1 попытка)")
+    print(f"🔍 МАКСИМАЛЬНО ЖЁСТКАЯ TCP-проверка")
+    print(f"TCP_TIMEOUT = {TCP_TIMEOUT} сек | MAX_LATENCY_MS = {MAX_LATENCY_MS} мс")
     print(f"Всего ссылок: {len(links)}\n")
 
     working = []
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {executor.submit(test_link, link): link for link in links}
         for future in as_completed(futures):
-            link = futures[future]
-            if future.result():
-                working.append(link)
-                print(f"✅")
+            result = future.result()
+            if result:
+                working.append(result)
+                print(f"✅ {result['latency']} мс")
             else:
-                print(f"❌")
+                print("❌")
+
+    working.sort(key=lambda x: x["latency"])
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        for link in working:
-            f.write(link + "\n")
+        for item in working:
+            f.write(item["link"] + "\n")
 
-    print(f"\n{'='*60}")
-    print(f"ГОТОВО: {len(working)} рабочих из {len(links)}")
-    print(f"{'='*60}")
+    print(f"\n{'='*75}")
+    print(f"МАКСИМАЛЬНО ЖЁСТКИЙ ОТБОР: {len(working)} рабочих ссылок из {len(links)}")
+    print(f"{'='*75}")
 
 if __name__ == "__main__":
     main()
