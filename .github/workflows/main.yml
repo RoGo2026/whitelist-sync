@@ -1,84 +1,118 @@
-name: Скачивать и объединять mobile-whitelist-1.txt на GitVerse (только чистые ссылки)
+name: Скачивать, проверять и обновлять mobile-whitelist-1.txt на GitVerse
 
 on:
   schedule:
     - cron: '*/40 * * * *'
   workflow_dispatch:
 
+# Защита от одновременных запусков (cron + AutoHotkey)
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
-  download-and-merge:
+  collect-sources:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout GitHub repository
         uses: actions/checkout@v4
 
-      - name: Скачать источники и создать чистый mobile-whitelist-1.txt (без комментариев)
+      - name: Скачать источники и создать чистый mobile-whitelist-1.txt
         run: |
           mkdir -p ./downloads
-
-          # Создаём пустой итоговый файл
           > mobile-whitelist-1.txt
 
           if [ ! -f sources.txt ]; then
-            echo "Ошибка: файл sources.txt не найден в корне репозитория на GitHub!" >&2
+            echo "Ошибка: файл sources.txt не найден в корне репозитория!" >&2
             exit 1
           fi
 
-          echo "Начинаем обработку обычных источников из sources.txt..."
+          echo "Обработка источников из sources.txt..."
 
           while IFS= read -r url || [ -n "$url" ]; do
             if [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]]; then
               continue
             fi
-
             url=$(echo "$url" | xargs)
-
             if [[ -n "$url" ]]; then
               filename=$(basename "$url")
               if curl -L -f --fail-early -o "./downloads/$filename" "$url"; then
                 grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
-                echo "Успешно добавлено (обычная ссылка): $url"
+                echo "Добавлено: $url"
               else
                 echo "Ошибка скачивания: $url" >&2
               fi
             fi
           done < sources.txt
 
-          # === СПЕЦИАЛЬНАЯ ОБРАБОТКА BASE64-ФАЙЛА С GITFLIC ===
-          echo "Декодируем Base64-файл с GitFlic..."
-          BASE64_RAW_URL="https://gitflic.ru/project/sigil/my-new-cool-project/blob/raw?file=whitelist&branch=master"
-          if curl -L -f --fail-early -o "./downloads/gitflic_base64.txt" "$BASE64_RAW_URL"; then
-            # Декодируем Base64 и добавляем только чистые ссылки
+          # Декодирование Base64 с GitFlic
+          echo "Декодирование Base64-файла с GitFlic..."
+          BASE64_URL="https://gitflic.ru/project/sigil/my-new-cool-project/blob/raw?file=whitelist&branch=master"
+          if curl -L -f --fail-early -o "./downloads/gitflic_base64.txt" "$BASE64_URL"; then
             base64 --decode "./downloads/gitflic_base64.txt" | grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt
-            echo "Base64-файл с GitFlic успешно декодирован и добавлен"
+            echo "Base64 с GitFlic успешно декодирован и добавлен"
           else
-            echo "Ошибка скачивания Base64-файла с GitFlic" >&2
+            echo "Ошибка скачивания Base64 с GitFlic" >&2
           fi
 
-          # Финальная очистка пустых строк
+          # Финальная очистка
           sed -i '/^$/d' mobile-whitelist-1.txt
 
-      - name: Клонировать GitVerse репозиторий
+      - name: Сохранить собранный файл для проверки
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw-whitelist
+          path: mobile-whitelist-1.txt
+
+  test-and-filter:
+    needs: collect-sources
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Скачать собранный файл
+        uses: actions/download-artifact@v4
+        with:
+          name: raw-whitelist
+
+      - name: Скачать и установить Xray-core
+        run: |
+          wget -q https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip -O xray.zip
+          unzip -q xray.zip
+          chmod +x xray
+          sudo mv xray /usr/local/bin/
+          echo "Xray-core установлен: $(xray version | head -n 1)"
+
+      - name: Запустить проверку ссылок через Xray-core
+        run: python3 check_links.py
+
+      - name: Обновить файл на GitVerse (только рабочие ссылки)
         run: |
           git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
 
-      - name: Обновить файл на GitVerse (всегда с новым временем)
-        working-directory: ./repo
-        run: |
+          # Копируем файл с рабочими ссылками
+          if [ -f working_whitelist.txt ]; then
+            cp -f working_whitelist.txt ./repo/mobile-whitelist-1.txt
+          else
+            cp -f mobile-whitelist-1.txt ./repo/mobile-whitelist-1.txt
+          fi
+
+          # Принудительное обновление времени
+          echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./repo/mobile-whitelist-1.txt
+
+          cd ./repo
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
           
-          cp -f ../mobile-whitelist-1.txt mobile-whitelist-1.txt
-          
-          # Принудительно обновляем время коммита
-          echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> mobile-whitelist-1.txt
-          
           git add mobile-whitelist-1.txt
           
-          if git commit -m "auto update clean whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
+          if git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
             git push
-            echo "Изменения успешно отправлены на GitVerse"
+            echo "✅ Файл с проверенными ссылками успешно отправлен на GitVerse"
           else
-            echo "Нет изменений в файле (кроме строки времени)"
+            echo "Нет изменений после проверки"
           fi
