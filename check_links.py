@@ -9,7 +9,7 @@ OUTPUT_FILE = "working_whitelist.txt"
 # ==================== МАКСИМАЛЬНО ЖЁСТКИЕ НАСТРОЙКИ ====================
 MAX_WORKERS = 5
 TCP_TIMEOUT = 2
-MAX_LATENCY_MS = 1500 
+MAX_LATENCY_MS = 1000 
 # =====================================================================
 
 def parse_host_port(link: str):
