@@ -7,9 +7,9 @@ INPUT_FILE = "mobile-whitelist-1.txt"
 OUTPUT_FILE = "working_whitelist.txt"
 
 # ==================== МАКСИМАЛЬНО ЖЁСТКИЕ НАСТРОЙКИ ====================
-MAX_WORKERS = 10
-TCP_TIMEOUT = 4
-MAX_LATENCY_MS = 4000 
+MAX_WORKERS = 7
+TCP_TIMEOUT = 2
+MAX_LATENCY_MS = 1500 
 # =====================================================================
 
 def parse_host_port(link: str):
