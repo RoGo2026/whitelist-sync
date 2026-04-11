@@ -7,9 +7,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 INPUT_FILE = "mobile-whitelist-1.txt"
 OUTPUT_FILE = "working_whitelist.txt"
 
-MAX_WORKERS = 10
-TEST_TIMEOUT = 2
-MAX_LATENCY_MS = 100
+MAX_WORKERS = 15
+TEST_TIMEOUT = 3
+MAX_LATENCY_MS = 2000
 MIN_WORKING_PERCENT = 5
 
 def parse_host_port(link: str):
