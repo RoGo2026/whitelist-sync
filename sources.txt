@@ -2,6 +2,7 @@ https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/Svoboda
 https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist
 https://raw.githubusercontent.com/RKPchannel/RKP_bypass_configs/refs/heads/main/configs/url_work.txt#
 https://raw.githubusercontent.com/FLEXIY0/matryoshka-vpn/refs/heads/main/configs/russia_whitelist.txt
+# https://raw.githubusercontent.com/ShadowException/VPN/refs/heads/main/configs/VPN-cat
 # https://raw.githubusercontent.com/zieng2/wl/refs/heads/main/vless_universal.txt
 # https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-SNI-RU-all.txt
 # https://raw.githubusercontent.com/ksenkovsolo/HardVPN-bypass-WhiteLists-/refs/heads/main/vpn-lte/WHITELIST-ALL.txt
