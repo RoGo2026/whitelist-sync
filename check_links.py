@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 INPUT_FILE = "mobile-whitelist-1.txt"
 OUTPUT_FILE = "working_whitelist.txt"
 
-MAX_WORKERS = 2
+MAX_WORKERS = 12
 TEST_TIMEOUT = 1
 MAX_LATENCY_MS = 500
 MIN_WORKING_PERCENT = 1
