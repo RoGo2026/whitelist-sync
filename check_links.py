@@ -8,8 +8,8 @@ INPUT_FILE = "mobile-whitelist-1.txt"
 OUTPUT_FILE = "working_whitelist.txt"
 
 MAX_WORKERS = 20
-TEST_TIMEOUT = 3
-MAX_LATENCY_MS = 2000
+TEST_TIMEOUT = 1
+MAX_LATENCY_MS = 1000
 MIN_WORKING_PERCENT = 5
 
 def parse_host_port(link: str):
