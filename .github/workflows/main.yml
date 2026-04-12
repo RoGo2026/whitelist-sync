@@ -5,7 +5,6 @@ on:
     - cron: '*/40 * * * *'
   workflow_dispatch:
 
-# Защита от одновременных запусков (cron + AutoHotkey)
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
@@ -13,7 +12,6 @@ concurrency:
 jobs:
   collect-sources:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout GitHub repository
         uses: actions/checkout@v4
@@ -46,7 +44,6 @@ jobs:
             fi
           done < sources.txt
 
-          # Декодирование Base64 с GitFlic
           echo "Декодирование Base64-файла с GitFlic..."
           BASE64_URL="https://gitflic.ru/project/sigil/my-new-cool-project/blob/raw?file=whitelist&branch=master"
           if curl -L -f --fail-early -o "./downloads/gitflic_base64.txt" "$BASE64_URL"; then
@@ -56,7 +53,6 @@ jobs:
             echo "Ошибка скачивания Base64 с GitFlic" >&2
           fi
 
-          # Финальная очистка
           sed -i '/^$/d' mobile-whitelist-1.txt
 
       - name: Сохранить собранный файл для проверки
@@ -69,7 +65,6 @@ jobs:
     needs: collect-sources
     runs-on: ubuntu-latest
     timeout-minutes: 25
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -79,37 +74,173 @@ jobs:
         with:
           name: raw-whitelist
 
-      - name: Скачать и установить Xray-core
+      - name: Установить Python зависимости
+        run: pip install requests requests[socks]
+
+      - name: Установить Xray-core
         run: |
           wget -q https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip -O xray.zip
           unzip -q xray.zip
           chmod +x xray
           sudo mv xray /usr/local/bin/
-          echo "Xray-core установлен: $(xray version | head -n 1)"
+          echo "✅ Xray-core установлен: $(xray version | head -n 1)"
 
-      - name: Запустить проверку ссылок через Xray-core
+      - name: Создать скрипт проверки
+        run: |
+          cat > check_links.py << 'PYTHON_SCRIPT'
+          #!/usr/bin/env python3
+          import socket, time, sys, os, subprocess, json, signal, random
+          from concurrent.futures import ThreadPoolExecutor, as_completed
+          from urllib.parse import urlparse, parse_qs, unquote
+          import base64
+
+          INPUT_FILE = "mobile-whitelist-1.txt"
+          OUTPUT_FILE = "working_whitelist.txt"
+          MAX_WORKERS = 6
+          TCP_TIMEOUT = 2.0
+          HTTP_TEST_TIMEOUT = 10.0
+          MAX_LATENCY_MS = 600
+          TEST_URL = "https://www.google.com/generate_204"
+          LOCAL_SOCKS_PORT_START = 11000
+          XRAY_PATH = "/usr/local/bin/xray"
+
+          def parse_vless(link):
+              try:
+                  parsed = urlparse(link); query = parse_qs(parsed.query)
+                  user_id = parsed.username or ""; host, port = parsed.hostname, parsed.port
+                  flow = query.get("flow", [""])[0]; security = query.get("security", ["none"])[0]
+                  sni = query.get("sni", [host if host else ""])[0]; fp = query.get("fp", ["chrome"])[0]
+                  alpn = query.get("alpn", ["h2,http/1.1"])[0]; pbk = query.get("pbk", [""])[0]; sid = query.get("sid", [""])[0]
+                  header_type = query.get("headerType", ["none"])[0]
+                  stream_settings = {"network": query.get("type", ["tcp"])[0], "security": security}
+                  if security in ("tls", "reality"):
+                      tls_settings = {"serverName": sni, "fingerprint": fp, "alpn": alpn.split(",")}
+                      if security == "reality" and pbk and sid: tls_settings.update({"publicKey": pbk[0], "shortId": sid[0]})
+                      stream_settings["tlsSettings"] = tls_settings
+                  if header_type != "none": stream_settings["tcpSettings"] = {"header": {"type": header_type}}
+                  return {"protocol": "vless", "settings": {"vnext": [{"address": host, "port": port, "users": [{"id": user_id, "flow": flow}]}]}, "streamSettings": stream_settings}
+              except: return None
+
+          def parse_trojan(link):
+              try:
+                  parsed = urlparse(link); query = parse_qs(parsed.query)
+                  password = unquote(parsed.username or ""); host, port = parsed.hostname, parsed.port
+                  sni = query.get("sni", [host if host else ""])[0]; alpn = query.get("alpn", ["h2,http/1.1"])[0]
+                  return {"protocol": "trojan", "settings": {"servers": [{"address": host, "port": port, "password": password}]}, "streamSettings": {"network": "tcp", "security": "tls", "tlsSettings": {"serverName": sni, "alpn": alpn.split(",")}}}
+              except: return None
+
+          def parse_ss(link):
+              try:
+                  parsed = urlparse(link); host, port = parsed.hostname, parsed.port; userinfo = parsed.username or ""
+                  if "@" in userinfo: method_pass = userinfo.split("@")[0]
+                  else:
+                      try: decoded = base64.b64decode(userinfo).decode().split(":", 1); method_pass = decoded[0] + ":" + decoded[1] if len(decoded) > 1 else decoded[0]
+                      except: method_pass = userinfo
+                  parts = method_pass.split(":", 1); method = parts[0] if len(parts) > 0 else "chacha20-ietf-poly1305"; password = parts[1] if len(parts) > 1 else ""
+                  return {"protocol": "shadowsocks", "settings": {"servers": [{"address": host, "port": port, "method": method, "password": password}]}}
+              except: return None
+
+          def parse_link(link):
+              if link.startswith("vless://"): return parse_vless(link), "vless"
+              elif link.startswith("trojan://"): return parse_trojan(link), "trojan"
+              elif link.startswith("ss://"): return parse_ss(link), "shadowsocks"
+              return None, None
+
+          def tcp_check(host, port, timeout):
+              start = time.time()
+              try:
+                  sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM); sock.settimeout(timeout)
+                  result = sock.connect_ex((host, port)); sock.close()
+                  return (result == 0, round((time.time() - start) * 1000, 1))
+              except: return (False, None)
+
+          def start_xray_proxy(config, protocol, local_port):
+              xray_config = {"log": {"loglevel": "error"}, "inbounds": [{"port": local_port, "listen": "127.0.0.1", "protocol": "socks", "settings": {"auth": "noauth", "udp": False, "ip": "127.0.0.1"}}], "outbounds": [{"protocol": protocol, "settings": config["settings"], "streamSettings": config.get("streamSettings")}]}
+              config_file = f"/tmp/xray_cfg_{local_port}.json"
+              with open(config_file, "w") as f: json.dump(xray_config, f)
+              try:
+                  proc = subprocess.Popen([XRAY_PATH, "run", "-config", config_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                  time.sleep(2.0); return proc
+              except: return None
+
+          def test_http_through_socks(socks_port, timeout):
+              try:
+                  import requests
+                  from requests.exceptions import ProxyError, ConnectTimeout, ReadTimeout, SSLError
+                  proxies = {"http": f"socks5h://127.0.0.1:{socks_port}", "https": f"socks5h://127.0.0.1:{socks_port}"}
+                  headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Accept": "*/*"}
+                  resp = requests.get(TEST_URL, proxies=proxies, headers=headers, timeout=timeout, verify=True, allow_redirects=False)
+                  return resp.status_code in (204, 301, 302, 429)
+              except (ProxyError, ConnectTimeout, ReadTimeout, SSLError): return False
+              except: return False
+
+          def test_link(link, local_port):
+              result = {"link": link, "status": "dead", "latency": None, "reason": ""}
+              config, protocol = parse_link(link)
+              if not config: result["reason"] = "parse_error"; return result
+              try:
+                  if protocol == "vless": host, port = config["settings"]["vnext"][0]["address"], config["settings"]["vnext"][0]["port"]
+                  elif protocol == "trojan": host, port = config["settings"]["servers"][0]["address"], config["settings"]["servers"][0]["port"]
+                  else: host, port = config["settings"]["servers"][0]["address"], config["settings"]["servers"][0]["port"]
+              except: result["reason"] = "extract_host_failed"; return result
+              tcp_ok, tcp_latency = tcp_check(host, port, TCP_TIMEOUT)
+              if not tcp_ok or tcp_latency is None or tcp_latency > MAX_LATENCY_MS: result["reason"] = "tcp_failed"; return result
+              result["latency"] = tcp_latency
+              proc = start_xray_proxy(config, protocol, local_port)
+              if not proc: result["reason"] = "xray_start_failed"; return result
+              try:
+                  if test_http_through_socks(local_port, HTTP_TEST_TIMEOUT): result["status"] = "ok"; result["reason"] = "http_ok"
+                  else: result["reason"] = "http_failed"
+              finally:
+                  try: proc.terminate(); proc.wait(timeout=3)
+                  except:
+                      try: os.kill(proc.pid, signal.SIGKILL)
+                      except: pass
+                  try: os.remove(f"/tmp/xray_cfg_{local_port}.json")
+                  except: pass
+              return result
+
+          def main():
+              if not os.path.exists(XRAY_PATH): print(f"❌ Xray not found at {XRAY_PATH}"); sys.exit(1)
+              if not os.path.exists(INPUT_FILE): print(f"❌ Input file {INPUT_FILE} not found"); sys.exit(1)
+              with open(INPUT_FILE, "r", encoding="utf-8") as f: links = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
+              if not links: print("❌ No links to test"); sys.exit(1)
+              print(f"🔍 Testing {len(links)} links (TCP + HTTP via xray)...")
+              working, results = [], []
+              with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+                  futures = {executor.submit(test_link, link, LOCAL_SOCKS_PORT_START + i): link for i, link in enumerate(links)}
+                  for future in as_completed(futures):
+                      res = future.result(); results.append(res); preview = (res['link'][:45] + "...") if len(res['link']) > 45 else res['link']
+                      if res["status"] == "ok": working.append(res); print(f"✅ ({res['latency']}ms) {preview}")
+                      else: print(f"❌ {preview} | {res['reason']}")
+              working.sort(key=lambda x: x["latency"])
+              with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+                  for item in working: f.write(item["link"] + "\n")
+              print(f"\n✅ Done. Working: {len(working)}/{len(links)}"); print(f"💾 Output: {OUTPUT_FILE}")
+              if len(working) == 0: print("⚠️  No working links found. Check: xray install, network, timeouts")
+
+          if __name__ == "__main__": main()
+          PYTHON_SCRIPT
+
+      - name: Запустить проверку ссылок
         run: python3 check_links.py
 
       - name: Обновить файл на GitVerse (только рабочие ссылки)
         run: |
           git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
 
-          # Копируем файл с рабочими ссылками
-          if [ -f working_whitelist.txt ]; then
+          if [ -f working_whitelist.txt ] && [ -s working_whitelist.txt ]; then
             cp -f working_whitelist.txt ./repo/mobile-whitelist-1.txt
+            echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./repo/mobile-whitelist-1.txt
           else
-            cp -f mobile-whitelist-1.txt ./repo/mobile-whitelist-1.txt
+            echo "⚠️  working_whitelist.txt пуст или не создан. Пропускаем обновление."
+            exit 0
           fi
-
-          # Принудительное обновление времени
-          echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./repo/mobile-whitelist-1.txt
 
           cd ./repo
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
-          
           git add mobile-whitelist-1.txt
-          
           if git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
             git push
             echo "✅ Файл с проверенными ссылками успешно отправлен на GitVerse"
