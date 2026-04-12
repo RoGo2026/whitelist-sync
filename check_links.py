@@ -6,7 +6,7 @@ import base64
 
 INPUT = "mobile-whitelist-1.txt"
 OUTPUT = "working_whitelist.txt"
-WORKERS = 8
+WORKERS = 15
 
 def parse_link(link):
     try:
