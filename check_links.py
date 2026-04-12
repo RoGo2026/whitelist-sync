@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-import sys, os, socket, time, subprocess, json, ssl, base64
+import sys, os, socket, time, ssl
 from urllib.parse import urlparse, parse_qs, unquote
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import base64
 
 INPUT = "mobile-whitelist-1.txt"
 OUTPUT = "working_whitelist.txt"
 WORKERS = 8
-XRAY = "/usr/local/bin/xray"
 
 def parse_link(link):
     try:
