@@ -1,5 +1,4 @@
 https://raw.githubusercontent.com/ShadowException/VPN/refs/heads/main/configs/VPN-cat
-https://raw.githubusercontent.com/prominbro/sub/refs/heads/main/212.txt
 https://raw.githubusercontent.com/tankist939-afk/Obhod-WL/refs/heads/main/Obhod%20WL
 https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist_full
 # https://raw.githubusercontent.com/RKPchannel/RKP_bypass_configs/refs/heads/main/configs/url_work.txt#
@@ -16,3 +15,4 @@ https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist_full
 # https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist
 # https://raw.githubusercontent.com/FLEXIY0/matryoshka-vpn/refs/heads/main/configs/russia_whitelist.txt
 # https://raw.githubusercontent.com/zieng2/wl/refs/heads/main/vless_universal.txt
+# https://raw.githubusercontent.com/prominbro/sub/refs/heads/main/212.txt
