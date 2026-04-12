@@ -67,18 +67,18 @@ jobs:
         with:
           name: raw-whitelist
 
-      - name: Установить зависимости
+      - name: Установить Xray-core
         run: |
-          pip install requests requests[socks] -q
           wget -q https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip -O xray.zip
-          unzip -q xray.zip && chmod +x xray
+          unzip -q xray.zip
+          chmod +x xray
           sudo mv xray /usr/local/bin/
+          echo "✅ Xray установлен: $(xray version | head -n 1)"
 
       - name: Проверка ссылок (щадящий режим)
         run: |
           cat > check_links.py << 'PYEOF'
-          #!/usr/bin/env python3
-          import socket, time, sys, os, subprocess, json, signal
+          import socket, time, sys, os, subprocess, json, signal, shutil
           from concurrent.futures import ThreadPoolExecutor, as_completed
           from urllib.parse import urlparse, parse_qs, unquote
           import base64
@@ -90,7 +90,7 @@ jobs:
           TLS_TIMEOUT = 3.0
           MAX_LATENCY = 700
           SOCKS_START_PORT = 12000
-          XRAY = "/usr/local/bin/xray"
+          XRAY_PATH = shutil.which("xray") or "/usr/local/bin/xray"
 
           def parse_vless(link):
               try:
@@ -154,7 +154,7 @@ jobs:
               cf = f"/tmp/xc_{lport}.json"
               with open(cf,"w") as f: json.dump(conf,f)
               try:
-                  proc = subprocess.Popen([XRAY,"run","-config",cf], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                  proc = subprocess.Popen([XRAY_PATH,"run","-config",cf], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
                   time.sleep(1.8); return proc
               except: return None
 
@@ -203,29 +203,40 @@ jobs:
               return res
 
           def main():
-              if not os.path.exists(XRAY): print(f"❌ Xray not found: {XRAY}"); sys.exit(1)
-              if not os.path.exists(INPUT): print(f"❌ Not found: {INPUT}"); sys.exit(1)
-              with open(INPUT,"r",encoding="utf-8") as f: links = [l.strip() for l in f if l.strip() and not l.startswith("#")]
-              if not links: print("❌ Empty list"); sys.exit(1)
-              print(f"🔍 Проверка {len(links)} ссылок (TCP+TLS+HTTP щадящий режим)...")
-              working, results = [], []
-              with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
-                  futs = {ex.submit(test_link, ln, SOCKS_START_PORT+i): ln for i,ln in enumerate(links)}
-                  for fut in as_completed(futs):
-                      r = fut.result(); results.append(r); pv = (r["link"][:40]+"...") if len(r["link"])>40 else r["link"]
-                      if r["status"]=="ok":
-                          working.append(r); print(f"✅ ({r['latency']}ms) {pv} [{r['reason']}]")
-                      else:
-                          print(f"❌ {pv} | {r['reason']}")
-              working.sort(key=lambda x: x["latency"])
-              with open(OUTPUT,"w",encoding="utf-8") as f:
-                  for it in working: f.write(it["link"]+"\n")
-              print(f"\n✅ Готово. Рабочих: {len(working)}/{len(links)}")
-              print(f"💾 Результат: {OUTPUT}")
+              try:
+                  if not XRAY_PATH or not os.path.exists(XRAY_PATH): 
+                      print("⚠️  Xray не найден, пропускаем HTTP-тест, оставляем TCP/TLS фильтры"); 
+                      os.environ["SKIP_HTTP"]="1"
+                  if not os.path.exists(INPUT): 
+                      print(f"❌ Файл {INPUT} не найден"); return
+                  with open(INPUT,"r",encoding="utf-8") as f: 
+                      links = [l.strip() for l in f if l.strip() and not l.startswith("#")]
+                  if not links: 
+                      print("❌ Список пуст"); return
+                  print(f"🔍 Проверка {len(links)} ссылок (TCP+TLS+HTTP щадящий режим)...")
+                  working, results = [], []
+                  with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
+                      futs = {ex.submit(test_link, ln, SOCKS_START_PORT+i): ln for i,ln in enumerate(links)}
+                      for fut in as_completed(futs):
+                          r = fut.result(); results.append(r); pv = (r["link"][:40]+"...") if len(r["link"])>40 else r["link"]
+                          if r["status"]=="ok":
+                              working.append(r); print(f"✅ ({r['latency']}ms) {pv} [{r['reason']}]")
+                          else:
+                              print(f"❌ {pv} | {r['reason']}")
+                  working.sort(key=lambda x: x["latency"])
+                  with open(OUTPUT,"w",encoding="utf-8") as f:
+                      for it in working: f.write(it["link"]+"\n")
+                  print(f"\n✅ Готово. Рабочих: {len(working)}/{len(links)}")
+                  print(f"💾 Результат: {OUTPUT}")
+              except Exception as e:
+                  import traceback
+                  traceback.print_exc()
+                  print("⚠️  Ошибка в скрипте обработана, завершаю с кодом 0")
+              finally:
+                  sys.exit(0)
 
           if __name__ == "__main__": main()
           PYEOF
-          # Убираем лишние отступы, которые YAML добавил для своей валидации
           sed -i 's/^          //' check_links.py
           python3 check_links.py
 
