@@ -1,4 +1,4 @@
-https://raw.githubusercontent.com/mheidari98/.proxy/refs/heads/main/all
+# https://raw.githubusercontent.com/mheidari98/.proxy/refs/heads/main/all
 # https://gitflic.ru/project/sigil/my-new-cool-project/blob/raw?file=whitelist&branch=master
 # https://mifa.world/vless
 
