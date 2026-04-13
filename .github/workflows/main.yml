@@ -46,7 +46,7 @@ jobs:
           fi
           echo ""
 
-          # ─── Обработка Base64.txt ───
+          # ─── Обработка Base64.txt (ДВУХУРОВНЕВАЯ СИСТЕМА) ───
           if [ -f "Base64.txt" ]; then
             echo "✅ Файл Base64.txt найден"
             
@@ -56,9 +56,9 @@ jobs:
               b64_url=$(echo "$b64_url" | xargs)
               [[ -z "$b64_url" ]] && continue
               
-              echo "📥 Обработка ссылки #$counter: $b64_url"
+              echo "📥 === УРОВЕНЬ 1: Обработка ссылки #$counter: $b64_url ==="
               
-              # Скачиваем Base64-файл
+              # Шаг 1: Скачиваем Base64-файл
               if curl -L -f -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
                 -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" \
                 -o "./downloads/b64_raw_$counter.txt" "$b64_url"; then
@@ -67,24 +67,58 @@ jobs:
                 echo "  ✅ Base64-файл скачан, размер: $file_size байт"
                 
                 if [ "$file_size" -gt 0 ]; then
-                  # Декодируем Base64 → получаем VLESS-ссылки
-                  if base64 -d "./downloads/b64_raw_$counter.txt" > "./downloads/vless_links_$counter.txt" 2>/dev/null; then
-                    echo "  ✅ Base64 декодирован, добавляю VLESS-ссылки..."
+                  # Шаг 2: Декодируем Base64 → получаем список URL файлов
+                  if base64 -d "./downloads/b64_raw_$counter.txt" > "./downloads/urls_list_$counter.txt" 2>/dev/null; then
+                    echo "  ✅ Base64 декодирован, получаем список URL файлов..."
                     
-                    # Просто копируем все непустые строки, которые начинаются с vless://
-                    grep '^vless://' "./downloads/vless_links_$counter.txt" >> mobile-whitelist-1.txt || true
+                    # Показываем какие URL нашли
+                    echo "  📄 Найдено URL для скачивания:"
+                    cat "./downloads/urls_list_$counter.txt" | grep -v '^[[:space:]]*#' | sed '/^$/d' | while read -r url_line; do
+                      echo "    - $url_line"
+                    done
+                    echo ""
                     
-                    vless_count=$(grep -c '^vless://' "./downloads/vless_links_$counter.txt" || echo "0")
-                    echo "  ✅ Добавлено VLESS-ссылок: $vless_count"
+                    # Шаг 3: Скачиваем каждый файл из списка
+                    echo "  📥 === УРОВЕНЬ 2: Скачиваем файлы по URL ==="
+                    url_counter=1
+                    while IFS= read -r file_url || [ -n "$file_url" ]; do
+                      [[ -z "$file_url" || "$file_url" =~ ^[[:space:]]*# ]] && continue
+                      file_url=$(echo "$file_url" | xargs)
+                      [[ -z "$file_url" ]] && continue
+                      
+                      echo "    📥 URL #$url_counter: $file_url"
+                      
+                      # Скачиваем файл с VLESS-ссылками
+                      if curl -L -f -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+                        -o "./downloads/vless_file_${counter}_${url_counter}.txt" "$file_url"; then
+                        
+                        vless_size=$(wc -c < "./downloads/vless_file_${counter}_${url_counter}.txt")
+                        if [ "$vless_size" -gt 0 ]; then
+                          echo "      ✅ Скачано ($vless_size байт), добавляю VLESS-ссылки..."
+                          
+                          # Добавляем VLESS-ссылки из файла
+                          grep '^vless://' "./downloads/vless_file_${counter}_${url_counter}.txt" >> mobile-whitelist-1.txt || true
+                          
+                          vless_count=$(grep -c '^vless://' "./downloads/vless_file_${counter}_${url_counter}.txt" || echo "0")
+                          echo "      ✅ Добавлено VLESS-ссылок: $vless_count"
+                          
+                          # Показываем примеры (первые 2)
+                          echo "      📄 Примеры:"
+                          grep '^vless://' "./downloads/vless_file_${counter}_${url_counter}.txt" | head -2 | while read -r vless_line; do
+                            country=$(echo "$vless_line" | sed 's/.*#//' | head -c 50)
+                            echo "        - $country"
+                          done
+                        else
+                          echo "      ⚠️ Файл пустой"
+                        fi
+                      else
+                        echo "      ❌ Не удалось скачать файл"
+                      fi
+                      ((url_counter++))
+                    done < "./downloads/urls_list_$counter.txt"
+                    echo "  ✅ Обработано URL: $((url_counter-1))"
                   else
-                    echo "  ⚠️ Ошибка декодирования Base64, пробую альтернативный метод..."
-                    # Пробуем с tr для очистки
-                    cat "./downloads/b64_raw_$counter.txt" | tr -d '\r\n\t ' | base64 -d > "./downloads/vless_links_$counter.txt" 2>/dev/null || true
-                    if [ -s "./downloads/vless_links_$counter.txt" ]; then
-                      grep '^vless://' "./downloads/vless_links_$counter.txt" >> mobile-whitelist-1.txt || true
-                      vless_count=$(grep -c '^vless://' "./downloads/vless_links_$counter.txt" || echo "0")
-                      echo "  ✅ Добавлено VLESS-ссылок (альт. метод): $vless_count"
-                    fi
+                    echo "  ⚠️ Ошибка декодирования Base64"
                   fi
                 else
                   echo "  ⚠️ Файл пустой"
