@@ -3,7 +3,7 @@ name: Fetch UWB Configs (Whitelist Bypass)
 on:
   schedule:
     - cron: '0 */2 * * *'     # каждые 2 часа
-  workflow_dispatch:          # ручной запуск
+  workflow_dispatch:
 
 jobs:
   fetch-configs:
@@ -17,7 +17,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Install dependencies
         run: |
