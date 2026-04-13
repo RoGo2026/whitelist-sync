@@ -1,4 +1,4 @@
-name: Fetch UWB Configs (Whitelist Bypass)
+name: Fetch UWB Configs → GitVerse (mobile-whitelist-1.txt)
 
 on:
   schedule:
@@ -9,7 +9,7 @@ jobs:
   fetch-configs:
     runs-on: ubuntu-latest
     permissions:
-      contents: write      # даём право на запись (push)
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -31,14 +31,20 @@ jobs:
       - name: Run automation script
         run: node fetch-configs.js
 
-      - name: Commit and push if changed
+      - name: Commit and push to GitVerse
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          git add uwb-configs.txt
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
+          
+          if [ -f mobile-whitelist-1.txt ]; then
+            git add mobile-whitelist-1.txt
+            if git diff --cached --quiet; then
+              echo "No changes detected"
+            else
+              git commit -m "Update mobile-whitelist-1.txt from UWB site $(date +'%Y-%m-%d %H:%M:%S EEST')"
+              git push
+            fi
           else
-            git commit -m "Update UWB configs $(date +'%Y-%m-%d %H:%M:%S EEST')"
-            git push
+            echo "Target file not found"
+            exit 1
           fi
