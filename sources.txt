@@ -2,6 +2,7 @@ https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile
 https://raw.githubusercontent.com/RKPchannel/RKP_bypass_configs/refs/heads/main/configs/url_work.txt
 https://raw.githubusercontent.com/ShadowException/VPN/refs/heads/main/configs/VPN-cat
 https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist
+https://raw.githubusercontent.com/EtoNeYaProject/etoneyaproject.github.io/refs/heads/main/whitelist
 # https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/Canada.txt
 # https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/Finland.txt
 # https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/France.txt
@@ -36,7 +37,6 @@ https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist
 # https://raw.githubusercontent.com/SoliSpirit/SolVPN/refs/heads/main/all_configs.txt
 # https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector_Py/refs/heads/main/sub/Mix/mix.txt
 # https://raw.githubusercontent.com/FLEXIY0/matryoshka-vpn/refs/heads/main/configs/russia_whitelist.txt
-# https://raw.githubusercontent.com/EtoNeYaProject/etoneyaproject.github.io/refs/heads/main/whitelist
 # https://raw.githubusercontent.com/zieng2/wl/refs/heads/main/vless_universal.txt
 # https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist_full
 # https://raw.githubusercontent.com/ksenkovsolo/HardVPN-bypass-WhiteLists-/refs/heads/main/vpn-lte/WHITELIST-ALL.txt
