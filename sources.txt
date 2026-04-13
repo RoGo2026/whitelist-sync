@@ -1,4 +1,8 @@
-https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/12.txt
+https://raw.githubusercontent.com/sevcator/5ubscrpt10n/main/protocols/ss.txt
+https://raw.githubusercontent.com/sevcator/5ubscrpt10n/main/protocols/tr.txt
+https://raw.githubusercontent.com/sevcator/5ubscrpt10n/main/protocols/vl.txt
+https://raw.githubusercontent.com/sevcator/5ubscrpt10n/main/protocols/vm.txt
+№ https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/12.txt
 № https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/2.txt
 # https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/1.txt
 # https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/14.txt
