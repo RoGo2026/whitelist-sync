@@ -1,6 +1,6 @@
-https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/2.txt
+https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/12.txt
+№ https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/2.txt
 # https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/1.txt
-# https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/12.txt
 # https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/14.txt
 # https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/15.txt
 # https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/19.txt
