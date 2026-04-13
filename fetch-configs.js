@@ -19,8 +19,8 @@ const { chromium } = require('playwright');
   console.log('Нажимаем кнопку "Начать поиск конфигов"...');
   await page.getByRole('button', { name: /Начать поиск конфигов/i }).click({ timeout: 10000 });
 
-  console.log('Ожидаем 90 секунд завершения поиска...');
-  await page.waitForTimeout(90000);
+  console.log('Ожидаем 60 секунд завершения поиска...');
+  await page.waitForTimeout(60000);
 
   console.log('Ожидаем кнопку "Скачать конфиги"...');
   await page.waitForSelector('button:has-text("Скачать конфиги")', { 
