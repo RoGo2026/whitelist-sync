@@ -46,12 +46,9 @@ jobs:
           fi
           echo ""
 
-          # ─── Обработка Base64.txt (ДВУХУРОВНЕВАЯ СИСТЕМА) ───
+          # ─── Обработка Base64.txt (ДВУХУРОВНЕВАЯ СИСТЕМА + ИЗВЛЕЧЕНИЕ ХОСТОВ) ───
           if [ -f "Base64.txt" ]; then
             echo "✅ Файл Base64.txt найден"
-            echo "Содержимое Base64.txt:"
-            cat Base64.txt
-            echo ""
             
             counter=1
             while IFS= read -r b64_url || [ -n "$b64_url" ]; do
@@ -73,11 +70,8 @@ jobs:
                   # Шаг 2: Декодируем Base64 → получаем список ссылок
                   if base64 -d "./downloads/b64_raw_$counter.txt" > "./downloads/links_list_$counter.txt" 2>/dev/null; then
                     echo "  ✅ Base64 декодирован, получаем список ссылок..."
-                    echo "  📄 Найденные ссылки:"
-                    cat "./downloads/links_list_$counter.txt" | grep -v '^[[:space:]]*#' | sed '/^$/d'
-                    echo ""
                     
-                    # Шаг 3: Проходим по каждой ссылке из списка и скачиваем реальные данные
+                    # Шаг 3: Проходим по каждой ссылке из списка
                     echo "  📥 === УРОВЕНЬ 2: Скачиваем файлы по ссылкам ==="
                     link_counter=1
                     while IFS= read -r inner_url || [ -n "$inner_url" ]; do
@@ -91,13 +85,45 @@ jobs:
                       if curl -L -f -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
                         -o "./downloads/inner_${counter}_${link_counter}.txt" "$inner_url"; then
                         
-                      inner_size=$(wc -c < "./downloads/inner_${counter}_${link_counter}.txt")
-                      if [ "$inner_size" -gt 0 ]; then
-                        echo "      ✅ Скачано ($inner_size байт), добавляю в whitelist"
-                        grep -v '^[[:space:]]*#' "./downloads/inner_${counter}_${link_counter}.txt" | sed '/^$/d' >> mobile-whitelist-1.txt
-                      else
-                        echo "      ⚠️ Файл пустой"
-                      fi
+                        inner_size=$(wc -c < "./downloads/inner_${counter}_${link_counter}.txt")
+                        if [ "$inner_size" -gt 0 ]; then
+                          echo "      ✅ Скачано ($inner_size байт)"
+                          
+                          # Извлекаем VLESS-ссылки и парсим хосты
+                          echo "      🔍 Извлекаю хосты из VLESS-ссылок..."
+                          
+                          # Читаем файл и обрабатываем каждую строку
+                          while IFS= read -r line || [ -n "$line" ]; do
+                            [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+                            
+                            # Если это VLESS-ссылка
+                            if [[ "$line" =~ ^vless:// ]]; then
+                              # Извлекаем хост разными способами
+                              # Формат 1: vless://uuid@host:port...
+                              host=$(echo "$line" | sed 's|vless://[^@]*@||' | sed 's|[:/?].*||')
+                              
+                              # Формат 2: ищем sni= параметр
+                              if [ -z "$host" ] || [[ "$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                                sni_host=$(echo "$line" | grep -oP 'sni=\K[^&]+' || true)
+                                if [ -n "$sni_host" ]; then
+                                  host="$sni_host"
+                                fi
+                              fi
+                              
+                              # Добавляем хост если нашли
+                              if [ -n "$host" ] && [[ ! "$host" =~ ^[0-9]+$ ]]; then
+                                echo "$host" >> mobile-whitelist-1.txt
+                                echo "        ✅ Добавлен хост: $host"
+                              fi
+                            else
+                              # Если не VLESS, просто добавляем строку (может быть домен/IP)
+                              echo "$line" >> mobile-whitelist-1.txt
+                            fi
+                          done < "./downloads/inner_${counter}_${link_counter}.txt"
+                          
+                        else
+                          echo "      ⚠️ Файл пустой"
+                        fi
                       else
                         echo "      ❌ Не удалось скачать"
                       fi
@@ -127,8 +153,8 @@ jobs:
             lines=$(wc -l < mobile-whitelist-1.txt)
             echo "📊 Строк в mobile-whitelist-1.txt: $lines"
             if [ "$lines" -gt 0 ]; then
-              echo "📄 Первые 10 строк:"
-              head -10 mobile-whitelist-1.txt
+              echo "📄 Первые 20 строк:"
+              head -20 mobile-whitelist-1.txt
             fi
             sort -u mobile-whitelist-1.txt -o mobile-whitelist-1.txt
             sed -i '/^$/d' mobile-whitelist-1.txt
