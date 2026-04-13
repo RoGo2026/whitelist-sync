@@ -1,8 +1,25 @@
-https://raw.githubusercontent.com/ssavnayt/AWCFG-CONFIG-LIST/refs/heads/main/Configs-AUTO.txt
-https://raw.githubusercontent.com/VP01596/vless-top15/refs/heads/main/AllNW.txt
-https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist
-https://raw.githubusercontent.com/V2RayRoot/V2RayConfig/refs/heads/main/Config/vless.txt
-https://raw.githubusercontent.com/V2RayRoot/V2RayConfig/refs/heads/main/Config/shadowsocks.txt
+https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/Canada.txt
+https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/Finland.txt
+https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/France.txt
+https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/Germany.txt
+https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/Hong%20Kong.txt
+https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/Iran.txt
+https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/Russia.txt
+https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/Spain.txt
+https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/The%20Netherlands.txt
+https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/United%20Kingdom.txt
+https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/United%20States.txt
+https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/Unknown.txt
+https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/grpc.txt
+https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/httpupgrade.txt
+https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/ss.txt
+https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/tcp.txt
+# https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/trojan.txt
+# https://raw.githubusercontent.com/ssavnayt/AWCFG-CONFIG-LIST/refs/heads/main/Configs-AUTO.txt
+# https://raw.githubusercontent.com/VP01596/vless-top15/refs/heads/main/AllNW.txt
+# https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist
+# https://raw.githubusercontent.com/V2RayRoot/V2RayConfig/refs/heads/main/Config/vless.txt
+# https://raw.githubusercontent.com/V2RayRoot/V2RayConfig/refs/heads/main/Config/shadowsocks.txt
 # https://raw.githubusercontent.com/tankist939-afk/Obhod-WL/refs/heads/main/Obhod%20WL
 # https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-SNI-RU-all.txt
 # https://raw.githubusercontent.com/LalatinaHub/Mineral/refs/heads/master/result/nodes
