@@ -140,14 +140,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Скачать файл
+      - name: Удалить старый файл (ВАЖНО!)
+        run: rm -f mobile-whitelist-1.txt
+
+      - name: Скачать свежий файл
         uses: actions/download-artifact@v4
         with:
           name: raw-whitelist
+          path: .  # Скачиваем прямо в корень, чтобы перезаписать
 
       - name: Показать содержимое файла
         run: |
-          echo "=== СОДЕРЖИМОЕ mobile-whitelist-1.txt ==="
+          echo "=== СОДЕРЖИМОЕ mobile-whitelist-1.txt (СВЕЖЕЕ) ==="
           if [ -f mobile-whitelist-1.txt ]; then
             lines=$(wc -l < mobile-whitelist-1.txt)
             echo "Всего строк: $lines"
@@ -158,7 +162,7 @@ jobs:
               echo "⚠️ Файл пустой!"
             fi
           else
-            echo "❌ Файл не найден"
+            echo "❌ Файл не найден!"
           fi
 
       - name: Установить Xray
