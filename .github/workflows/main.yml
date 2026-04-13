@@ -112,14 +112,18 @@ jobs:
             lines=$(wc -l < mobile-whitelist-1.txt)
             echo "📊 Строк в mobile-whitelist-1.txt: $lines"
             if [ "$lines" -gt 0 ]; then
-              echo "📄 Первые 10 строк:"
+              echo "📄 Первые 10 строк ПЕРЕД очисткой:"
               head -10 mobile-whitelist-1.txt
             fi
-            sort -u mobile-whitelist-1.txt -o mobile-whitelist-1.txt
+            # НЕ делаем sort -u чтобы не потерять порядок!
             sed -i '/^$/d' mobile-whitelist-1.txt
-            echo "✅ Файл очищен от дубликатов и пустых строк"
+            echo "✅ Файл очищен от пустых строк"
             final_lines=$(wc -l < mobile-whitelist-1.txt)
             echo "📊 Итоговое количество строк: $final_lines"
+            
+            # ПРОВЕРКА: показываем страны
+            echo "🌍 Список стран в файле:"
+            grep '^vless://' mobile-whitelist-1.txt | sed 's/.*#//' | sort -u | head -15
           else
             echo "❌ Файл mobile-whitelist-1.txt не создан"
           fi
@@ -157,6 +161,8 @@ jobs:
             cp -f ./artifact-download/mobile-whitelist-1.txt ./mobile-whitelist-1.txt
             echo "✅ Файл заменён"
             echo "📊 Строк в новом файле: $(wc -l < ./mobile-whitelist-1.txt)"
+            echo "🌍 Список стран в СВЕЖЕМ файле:"
+            grep '^vless://' ./mobile-whitelist-1.txt | sed 's/.*#//' | sort -u | head -15
           else
             echo "❌ Файл не найден в артефакте!"
             exit 1
