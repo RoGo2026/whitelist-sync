@@ -22,8 +22,25 @@ jobs:
           mkdir -p ./downloads
           > mobile-whitelist-1.txt
           
-          # Обработка Base64.txt
-          if [ -f "Base64.txt" ]; then
+          # ─── Обработка sources.txt (обычные ссылки) ───
+          if [ -f sources.txt ]; then
+            echo "📥 Обработка sources.txt..."
+            while IFS= read -r url || [ -n "$url" ]; do
+              [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]] && continue
+              url=$(echo "$url" | xargs)
+              [[ -z "$url" ]] && continue
+              
+              filename=$(basename "$url")
+              if curl -L -f -s -o "./downloads/$filename" "$url"; then
+                grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
+                echo "  ✅ Добавлено: $url"
+              fi
+            done < sources.txt
+          fi
+          
+          # ─── Обработка Base64.txt (Base64-ссылки) ───
+          if [ -f Base64.txt ]; then
+            echo "📥 Обработка Base64.txt..."
             while IFS= read -r b64_url || [ -n "$b64_url" ]; do
               [[ -z "$b64_url" || "$b64_url" =~ ^[[:space:]]*# ]] && continue
               b64_url=$(echo "$b64_url" | xargs)
@@ -31,7 +48,7 @@ jobs:
               # Скачиваем и декодируем Base64
               if curl -L -f -s -A "Mozilla/5.0" -o "./downloads/b64.txt" "$b64_url"; then
                 if base64 -d "./downloads/b64.txt" 2>/dev/null | grep '^vless://' >> mobile-whitelist-1.txt; then
-                  echo "✅ VLESS-ссылки добавлены"
+                  echo "  ✅ VLESS-ссылки из: $b64_url"
                 fi
               fi
             done < Base64.txt
@@ -39,6 +56,7 @@ jobs:
           
           # Очистка файла
           sed -i '/^$/d' mobile-whitelist-1.txt
+          sort -u mobile-whitelist-1.txt -o mobile-whitelist-1.txt
           echo "📊 Всего ссылок: $(wc -l < mobile-whitelist-1.txt)"
 
       - name: Установить Xray
