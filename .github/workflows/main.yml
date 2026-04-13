@@ -46,7 +46,7 @@ jobs:
           fi
           echo ""
 
-          # ─── Обработка Base64.txt (ПРЯМОЕ ДОБАВЛЕНИЕ VLESS-ССЫЛОК) ───
+          # ─── Обработка Base64.txt ───
           if [ -f "Base64.txt" ]; then
             echo "✅ Файл Base64.txt найден"
             
@@ -71,28 +71,20 @@ jobs:
                   if base64 -d "./downloads/b64_raw_$counter.txt" > "./downloads/vless_links_$counter.txt" 2>/dev/null; then
                     echo "  ✅ Base64 декодирован, добавляю VLESS-ссылки..."
                     
-                    # Читаем файл и добавляем каждую VLESS-ссылку
-                    vless_count=0
-                    while IFS= read -r line || [ -n "$line" ]; do
-                      [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
-                      
-                      # Если это VLESS-ссылка — добавляем её
-                      if [[ "$line" =~ ^vless:// ]]; then
-                        echo "$line" >> mobile-whitelist-1.txt
-                        ((vless_count++))
-                        # Извлекаем страну/название для отображения
-                        country=$(echo "$line" | sed 's/.*#//' | head -c 50)
-                        if [ -n "$country" ]; then
-                          echo "    ✅ #$vless_count: $country"
-                        else
-                          echo "    ✅ #$vless_count: VLESS-ссылка добавлена"
-                        fi
-                      fi
-                    done < "./downloads/vless_links_$counter.txt"
+                    # Просто копируем все непустые строки, которые начинаются с vless://
+                    grep '^vless://' "./downloads/vless_links_$counter.txt" >> mobile-whitelist-1.txt || true
                     
-                    echo "  ✅ Всего добавлено VLESS-ссылок: $vless_count"
+                    vless_count=$(grep -c '^vless://' "./downloads/vless_links_$counter.txt" || echo "0")
+                    echo "  ✅ Добавлено VLESS-ссылок: $vless_count"
                   else
-                    echo "  ⚠️ Ошибка декодирования Base64"
+                    echo "  ⚠️ Ошибка декодирования Base64, пробую альтернативный метод..."
+                    # Пробуем с tr для очистки
+                    cat "./downloads/b64_raw_$counter.txt" | tr -d '\r\n\t ' | base64 -d > "./downloads/vless_links_$counter.txt" 2>/dev/null || true
+                    if [ -s "./downloads/vless_links_$counter.txt" ]; then
+                      grep '^vless://' "./downloads/vless_links_$counter.txt" >> mobile-whitelist-1.txt || true
+                      vless_count=$(grep -c '^vless://' "./downloads/vless_links_$counter.txt" || echo "0")
+                      echo "  ✅ Добавлено VLESS-ссылок (альт. метод): $vless_count"
+                    fi
                   fi
                 else
                   echo "  ⚠️ Файл пустой"
@@ -120,10 +112,13 @@ jobs:
             sort -u mobile-whitelist-1.txt -o mobile-whitelist-1.txt
             sed -i '/^$/d' mobile-whitelist-1.txt
             echo "✅ Файл очищен от дубликатов и пустых строк"
-            echo "📊 Итоговое количество строк: $(wc -l < mobile-whitelist-1.txt)"
+            final_lines=$(wc -l < mobile-whitelist-1.txt)
+            echo "📊 Итоговое количество строк: $final_lines"
           else
             echo "❌ Файл mobile-whitelist-1.txt не создан"
           fi
+          
+          echo "✅ Процесс завершен успешно"
 
       - name: Сохранить файл
         uses: actions/upload-artifact@v4
