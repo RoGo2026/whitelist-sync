@@ -6,7 +6,7 @@ import base64
 
 INPUT = "mobile-whitelist-1.txt"
 OUTPUT = "working_whitelist.txt"
-WORKERS = 6
+WORKERS = 12
 XRAY = "/usr/local/bin/xray"
 
 def parse_link(link):
