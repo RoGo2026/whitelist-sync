@@ -1,4 +1,7 @@
-https://raw.githubusercontent.com/SoliSpirit/SolVPN/refs/heads/main/all_configs.txt
+https://raw.githubusercontent.com/Argh94/Proxy-List/main/All_Config.txt
+https://raw.githubusercontent.com/Argh94/Proxy-List/main/ShadowSocks.txt
+https://raw.githubusercontent.com/Argh94/Proxy-List/main/Trojan.txt
+# https://raw.githubusercontent.com/SoliSpirit/SolVPN/refs/heads/main/all_configs.txt
 # https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector_Py/refs/heads/main/sub/Mix/mix.txt
 # https://raw.githubusercontent.com/FLEXIY0/matryoshka-vpn/refs/heads/main/configs/russia_whitelist.txt
 # https://raw.githubusercontent.com/EtoNeYaProject/etoneyaproject.github.io/refs/heads/main/whitelist
