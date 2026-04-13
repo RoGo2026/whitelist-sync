@@ -46,7 +46,7 @@ jobs:
           fi
           echo ""
 
-          # ─── Обработка Base64.txt (ДВУХУРОВНЕВАЯ СИСТЕМА) ───
+          # ─── Обработка Base64.txt (ПРЯМОЕ ДОБАВЛЕНИЕ VLESS-ССЫЛОК) ───
           if [ -f "Base64.txt" ]; then
             echo "✅ Файл Base64.txt найден"
             
@@ -56,9 +56,9 @@ jobs:
               b64_url=$(echo "$b64_url" | xargs)
               [[ -z "$b64_url" ]] && continue
               
-              echo "📥 === УРОВЕНЬ 1: Обработка ссылки #$counter: $b64_url ==="
+              echo "📥 Обработка ссылки #$counter: $b64_url"
               
-              # Шаг 1: Скачиваем Base64-файл
+              # Скачиваем Base64-файл
               if curl -L -f -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
                 -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" \
                 -o "./downloads/b64_raw_$counter.txt" "$b64_url"; then
@@ -67,56 +67,30 @@ jobs:
                 echo "  ✅ Base64-файл скачан, размер: $file_size байт"
                 
                 if [ "$file_size" -gt 0 ]; then
-                  # Шаг 2: Декодируем Base64 → получаем список ссылок
-                  if base64 -d "./downloads/b64_raw_$counter.txt" > "./downloads/links_list_$counter.txt" 2>/dev/null; then
-                    echo "  ✅ Base64 декодирован, получаем список ссылок..."
+                  # Декодируем Base64 → получаем VLESS-ссылки
+                  if base64 -d "./downloads/b64_raw_$counter.txt" > "./downloads/vless_links_$counter.txt" 2>/dev/null; then
+                    echo "  ✅ Base64 декодирован, добавляю VLESS-ссылки..."
                     
-                    # Шаг 3: Проходим по каждой ссылке из списка
-                    echo "  📥 === УРОВЕНЬ 2: Скачиваем файлы по ссылкам ==="
-                    link_counter=1
-                    while IFS= read -r inner_url || [ -n "$inner_url" ]; do
-                      [[ -z "$inner_url" || "$inner_url" =~ ^[[:space:]]*# ]] && continue
-                      inner_url=$(echo "$inner_url" | xargs)
-                      [[ -z "$inner_url" ]] && continue
+                    # Читаем файл и добавляем каждую VLESS-ссылку
+                    vless_count=0
+                    while IFS= read -r line || [ -n "$line" ]; do
+                      [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
                       
-                      echo "    📥 Ссылка #$link_counter: $inner_url"
-                      
-                      # Скачиваем файл по внутренней ссылке
-                      if curl -L -f -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
-                        -o "./downloads/inner_${counter}_${link_counter}.txt" "$inner_url"; then
-                        
-                        inner_size=$(wc -c < "./downloads/inner_${counter}_${link_counter}.txt")
-                        if [ "$inner_size" -gt 0 ]; then
-                          echo "      ✅ Скачано ($inner_size байт), обрабатываю содержимое..."
-                          
-                          # Читаем файл и обрабатываем каждую строку
-                          while IFS= read -r line || [ -n "$line" ]; do
-                            [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
-                            
-                            # Если это VLESS-ссылка — просто добавляем её в файл
-                            if [[ "$line" =~ ^vless:// ]]; then
-                              echo "$line" >> mobile-whitelist-1.txt
-                              # Извлекаем название для отображения
-                              country=$(echo "$line" | grep -oP '#\K.*$' || echo "Unknown")
-                              echo "        ✅ Добавлена VLESS-ссылка ($country)"
-                            else
-                              # Если не VLESS, проверяем — может быть это домен/IP
-                              if [[ "$line" =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,} ]] || [[ "$line" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                                echo "$line" >> mobile-whitelist-1.txt
-                                echo "        ✅ Добавлен хост: $line"
-                              fi
-                            fi
-                          done < "./downloads/inner_${counter}_${link_counter}.txt"
-                          
+                      # Если это VLESS-ссылка — добавляем её
+                      if [[ "$line" =~ ^vless:// ]]; then
+                        echo "$line" >> mobile-whitelist-1.txt
+                        ((vless_count++))
+                        # Извлекаем страну/название для отображения
+                        country=$(echo "$line" | sed 's/.*#//' | head -c 50)
+                        if [ -n "$country" ]; then
+                          echo "    ✅ #$vless_count: $country"
                         else
-                          echo "      ⚠️ Файл пустой"
+                          echo "    ✅ #$vless_count: VLESS-ссылка добавлена"
                         fi
-                      else
-                        echo "      ❌ Не удалось скачать файл"
                       fi
-                      ((link_counter++))
-                    done < "./downloads/links_list_$counter.txt"
-                    echo "  ✅ Обработано внутренних ссылок: $((link_counter-1))"
+                    done < "./downloads/vless_links_$counter.txt"
+                    
+                    echo "  ✅ Всего добавлено VLESS-ссылок: $vless_count"
                   else
                     echo "  ⚠️ Ошибка декодирования Base64"
                   fi
@@ -177,6 +151,7 @@ jobs:
             lines=$(wc -l < mobile-whitelist-1.txt)
             echo "Всего строк: $lines"
             if [ "$lines" -gt 0 ]; then
+              echo "📄 Первые 20 строк:"
               head -20 mobile-whitelist-1.txt
             else
               echo "⚠️ Файл пустой!"
