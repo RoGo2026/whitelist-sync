@@ -2,8 +2,8 @@ name: Fetch UWB Configs (Whitelist Bypass)
 
 on:
   schedule:
-    - cron: '0 */2 * * *'     # каждые 2 часа (можно изменить)
-  workflow_dispatch:          # можно запускать вручную
+    - cron: '0 */2 * * *'     # каждые 2 часа
+  workflow_dispatch:          # ручной запуск
 
 jobs:
   fetch-configs:
@@ -17,11 +17,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
 
-      - name: Install Playwright
+      - name: Install dependencies
         run: |
           npm init -y
           npm install playwright
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
 
       - name: Run automation script
         run: node fetch-configs.js
