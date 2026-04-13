@@ -28,10 +28,6 @@ jobs:
           # ─── Обработка sources.txt ───
           if [ -f sources.txt ]; then
             echo "✅ Файл sources.txt найден"
-            echo "Содержимое sources.txt:"
-            cat sources.txt
-            echo ""
-            
             while IFS= read -r url || [ -n "$url" ]; do
               [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]] && continue
               url=$(echo "$url" | xargs)
@@ -50,7 +46,7 @@ jobs:
           fi
           echo ""
 
-          # ─── Обработка Base64.txt (ссылки, возвращающие Base64 с данными) ───
+          # ─── Обработка Base64.txt (ДВУХУРОВНЕВАЯ СИСТЕМА) ───
           if [ -f "Base64.txt" ]; then
             echo "✅ Файл Base64.txt найден"
             echo "Содержимое Base64.txt:"
@@ -63,53 +59,59 @@ jobs:
               b64_url=$(echo "$b64_url" | xargs)
               [[ -z "$b64_url" ]] && continue
               
-              echo "📥 Обработка ссылки #$counter: $b64_url"
+              echo "📥 === УРОВЕНЬ 1: Обработка ссылки #$counter: $b64_url ==="
               
-              # Скачиваем содержимое с заголовками браузера (оно в формате Base64)
-              if curl -L -f -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
-                -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8" \
-                -H "Accept-Language: en-US,en;q=0.5" \
-                -H "Connection: keep-alive" \
+              # Шаг 1: Скачиваем Base64-файл
+              if curl -L -f -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+                -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" \
                 -o "./downloads/b64_raw_$counter.txt" "$b64_url"; then
                 
                 file_size=$(wc -c < "./downloads/b64_raw_$counter.txt")
-                echo "  ✅ Файл скачан, размер: $file_size байт"
+                echo "  ✅ Base64-файл скачан, размер: $file_size байт"
                 
                 if [ "$file_size" -gt 0 ]; then
-                  echo "  📄 Первые 100 символов:"
-                  head -c 100 "./downloads/b64_raw_$counter.txt"
-                  echo ""
-                  
-                  # Декодируем Base64 → получаем чистые строки (VLESS-ссылки)
-                  if base64 -d "./downloads/b64_raw_$counter.txt" > "./downloads/decoded_$counter.txt" 2>/dev/null; then
-                    echo "  ✅ Base64 декодирован успешно"
-                    echo "  📄 Декодированное содержимое (первые 5 строк):"
-                    head -5 "./downloads/decoded_$counter.txt"
+                  # Шаг 2: Декодируем Base64 → получаем список ссылок
+                  if base64 -d "./downloads/b64_raw_$counter.txt" > "./downloads/links_list_$counter.txt" 2>/dev/null; then
+                    echo "  ✅ Base64 декодирован, получаем список ссылок..."
+                    echo "  📄 Найденные ссылки:"
+                    cat "./downloads/links_list_$counter.txt" | grep -v '^[[:space:]]*#' | sed '/^$/d'
+                    echo ""
                     
-                    # Извлекаем только полезные строки
-                    grep -v '^[[:space:]]*#' "./downloads/decoded_$counter.txt" 2>/dev/null | sed '/^$/d' >> mobile-whitelist-1.txt
-                    echo "  ✅ Добавлено в mobile-whitelist-1.txt"
+                    # Шаг 3: Проходим по каждой ссылке из списка и скачиваем реальные данные
+                    echo "  📥 === УРОВЕНЬ 2: Скачиваем файлы по ссылкам ==="
+                    link_counter=1
+                    while IFS= read -r inner_url || [ -n "$inner_url" ]; do
+                      [[ -z "$inner_url" || "$inner_url" =~ ^[[:space:]]*# ]] && continue
+                      inner_url=$(echo "$inner_url" | xargs)
+                      [[ -z "$inner_url" ]] && continue
+                      
+                      echo "    📥 Ссылка #$link_counter: $inner_url"
+                      
+                      # Скачиваем файл по внутренней ссылке
+                      if curl -L -f -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+                        -o "./downloads/inner_${counter}_${link_counter}.txt" "$inner_url"; then
+                        
+                      inner_size=$(wc -c < "./downloads/inner_${counter}_${link_counter}.txt")
+                      if [ "$inner_size" -gt 0 ]; then
+                        echo "      ✅ Скачано ($inner_size байт), добавляю в whitelist"
+                        grep -v '^[[:space:]]*#' "./downloads/inner_${counter}_${link_counter}.txt" | sed '/^$/d' >> mobile-whitelist-1.txt
+                      else
+                        echo "      ⚠️ Файл пустой"
+                      fi
+                      else
+                        echo "      ❌ Не удалось скачать"
+                      fi
+                      ((link_counter++))
+                    done < "./downloads/links_list_$counter.txt"
+                    echo "  ✅ Обработано внутренних ссылок: $((link_counter-1))"
                   else
-                    echo "  ⚠️ Стандартное декодирование не сработало, пробую режим совместимости..."
-                    if cat "./downloads/b64_raw_$counter.txt" | tr -d '\r\n\t ' | base64 -d > "./downloads/decoded_$counter.txt" 2>/dev/null; then
-                      echo "  ✅ Декодировано в режиме совместимости"
-                      grep -v '^[[:space:]]*#' "./downloads/decoded_$counter.txt" 2>/dev/null | sed '/^$/d' >> mobile-whitelist-1.txt
-                    else
-                      echo "  ❌ Ошибка декодирования"
-                    fi
+                    echo "  ⚠️ Ошибка декодирования Base64"
                   fi
                 else
                   echo "  ⚠️ Файл пустой"
                 fi
               else
-                echo "  ❌ Не удалось скачать файл (ошибка curl)"
-                echo "  🔍 Пробую без проверки сертификата..."
-                if curl -L -f -s -k -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -o "./downloads/b64_raw_$counter.txt" "$b64_url"; then
-                  echo "  ✅ Скачано с -k (пропуск SSL)"
-                  cat "./downloads/b64_raw_$counter.txt" | tr -d '\r\n\t ' | base64 -d 2>/dev/null | \
-                    grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt || \
-                    echo "  ⚠️ Декодирование не удалось"
-                fi
+                echo "  ❌ Не удалось скачать Base64-файл"
               fi
               ((counter++))
             done < Base64.txt
@@ -125,12 +127,13 @@ jobs:
             lines=$(wc -l < mobile-whitelist-1.txt)
             echo "📊 Строк в mobile-whitelist-1.txt: $lines"
             if [ "$lines" -gt 0 ]; then
-              echo "📄 Первые 5 строк:"
-              head -5 mobile-whitelist-1.txt
+              echo "📄 Первые 10 строк:"
+              head -10 mobile-whitelist-1.txt
             fi
             sort -u mobile-whitelist-1.txt -o mobile-whitelist-1.txt
             sed -i '/^$/d' mobile-whitelist-1.txt
             echo "✅ Файл очищен от дубликатов и пустых строк"
+            echo "📊 Итоговое количество строк: $(wc -l < mobile-whitelist-1.txt)"
           else
             echo "❌ Файл mobile-whitelist-1.txt не создан"
           fi
