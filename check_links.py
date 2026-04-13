@@ -7,9 +7,9 @@ import base64
 # ───────── НАСТРОЙКИ ─────────
 INPUT = "mobile-whitelist-1.txt"
 OUTPUT = "working_whitelist.txt"
-MAX_WORKERS = 30            # Количество потоков
-TEST_TIMEOUT = 1            # Таймаут подключения (сек)
-MAX_LATENCY_MS = 700        # Максимальный пинг для пропуска ссылки
+MAX_WORKERS = 10
+TEST_TIMEOUT = 2
+MAX_LATENCY_MS = 1000
 # ─────────────────────────────
 
 def parse_link(link):
