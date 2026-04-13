@@ -34,7 +34,7 @@ jobs:
             done < sources.txt
           fi
 
-          # ─── Обработка Base64.txt (ссылки на файлы с Base64) ───
+          # ─── Обработка Base64.txt (ссылки, возвращающие Base64 с данными) ───
           if [ -f "Base64.txt" ]; then
             echo "🔍 Найдено Base64.txt, обрабатываю ссылки..."
             counter=1
@@ -45,28 +45,32 @@ jobs:
               
               echo "📥 Обработка ссылки #$counter: $b64_url"
               
-              # Скачиваем файл с Base64-данными
-              if curl -L -f -s -o "./downloads/b64_source_$counter.txt" "$b64_url"; then
-                echo "  ✅ Файл скачан, декодирую..."
+              # Скачиваем содержимое (оно в формате Base64)
+              if curl -L -f -s -o "./downloads/b64_raw_$counter.txt" "$b64_url"; then
+                echo "  ✅ Файл скачан, декодирую Base64..."
                 
-                # Пробуем декодировать
-                if base64 -d "./downloads/b64_source_$counter.txt" > "./downloads/b64_decoded_$counter.txt" 2>/dev/null; then
-                  grep -v '^[[:space:]]*#' "./downloads/b64_decoded_$counter.txt" 2>/dev/null | sed '/^$/d' >> mobile-whitelist-1.txt
+                # Декодируем Base64 → получаем VLESS-ссылки или список
+                # Пробуем стандартное декодирование всего файла
+                if base64 -d "./downloads/b64_raw_$counter.txt" > "./downloads/decoded_$counter.txt" 2>/dev/null; then
+                  # Извлекаем только полезные строки (пропускаем комментарии и пустоты)
+                  grep -v '^[[:space:]]*#' "./downloads/decoded_$counter.txt" 2>/dev/null | sed '/^$/d' >> mobile-whitelist-1.txt
                   echo "  ✅ Декодировано успешно"
                 else
-                  # Пробуем с очисткой от пробелов
-                  cat "./downloads/b64_source_$counter.txt" | tr -d '\r\n\t ' | base64 -d 2>/dev/null | \
-                    grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt || \
-                    echo "  ⚠️ Ошибка декодирования"
+                  # Пробуем режим совместимости: удаляем пробелы/переносы перед декодированием
+                  echo "  ⚠️ Пробую режим совместимости..."
+                  cat "./downloads/b64_raw_$counter.txt" | tr -d '\r\n\t ' | base64 -d 2>/dev/null | \
+                    grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt && \
+                    echo "  ✅ Декодировано в режиме совместимости" || \
+                    echo "  ❌ Ошибка декодирования"
                 fi
               else
-                echo "  ❌ Не удалось скачать файл"
+                echo "  ❌ Не удалось скачать файл по ссылке"
               fi
               ((counter++))
             done < Base64.txt
-            echo "✅ Обработано ссылок: $((counter-1))"
+            echo "✅ Обработано ссылок из Base64.txt: $((counter-1))"
           else
-            echo "⚠️ Файл Base64.txt не найден, пропускаю"
+            echo "⚠️ Файл Base64.txt не найден, пропускаю этот этап"
           fi
           # ─── Конец обработки ───
 
