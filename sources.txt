@@ -1,6 +1,6 @@
-https://raw.githubusercontent.com/ssavnayt/AWCFG-CONFIG-LIST/refs/heads/main/Configs-AUTO.txt
-https://raw.githubusercontent.com/VP01596/vless-top15/refs/heads/main/AllNW.txt
-https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist
+# https://raw.githubusercontent.com/ssavnayt/AWCFG-CONFIG-LIST/refs/heads/main/Configs-AUTO.txt
+# https://raw.githubusercontent.com/VP01596/vless-top15/refs/heads/main/AllNW.txt
+# https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist
 # https://raw.githubusercontent.com/prominbro/sub/refs/heads/main/212.txt
 # https://raw.githubusercontent.com/V2RayRoot/V2RayConfig/refs/heads/main/Config/vless.txt
 # https://raw.githubusercontent.com/V2RayRoot/V2RayConfig/refs/heads/main/Config/shadowsocks.txt
