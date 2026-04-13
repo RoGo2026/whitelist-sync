@@ -1,8 +1,8 @@
-https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt
 https://raw.githubusercontent.com/RKPchannel/RKP_bypass_configs/refs/heads/main/configs/url_work.txt
-https://raw.githubusercontent.com/ShadowException/VPN/refs/heads/main/configs/VPN-cat
-https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist
-https://raw.githubusercontent.com/EtoNeYaProject/etoneyaproject.github.io/refs/heads/main/whitelist
+# https://raw.githubusercontent.com/ShadowException/VPN/refs/heads/main/configs/VPN-cat
+# https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist
+# https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt
+# https://raw.githubusercontent.com/EtoNeYaProject/etoneyaproject.github.io/refs/heads/main/whitelist
 # https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/Canada.txt
 # https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/Finland.txt
 # https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/France.txt
