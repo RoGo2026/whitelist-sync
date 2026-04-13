@@ -49,7 +49,7 @@ jobs:
               if curl -L -f -s -o "./downloads/b64_raw_$counter.txt" "$b64_url"; then
                 echo "  ✅ Файл скачан, декодирую Base64..."
                 
-                # Декодируем Base64 → получаем VLESS-ссылки или список
+                # Декодируем Base64 → получаем чистые строки (VLESS-ссылки)
                 # Пробуем стандартное декодирование всего файла
                 if base64 -d "./downloads/b64_raw_$counter.txt" > "./downloads/decoded_$counter.txt" 2>/dev/null; then
                   # Извлекаем только полезные строки (пропускаем комментарии и пустоты)
