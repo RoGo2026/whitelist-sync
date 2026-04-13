@@ -1,72 +1,81 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
 
-async function getConfigsFromSite(url, startButtonText, downloadButtonText, waitTime = 90000) {
-  console.log(`Открываем сайт: ${url}`);
+(async () => {
+  console.log('Запуск браузера и открытие двух сайтов параллельно...');
+  
   const browser = await chromium.launch({ 
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
-  
-  const page = await browser.newPage();
-  await page.setViewportSize({ width: 1280, height: 800 });
 
-  await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+  const page1 = await browser.newPage();  // Сайт 1 — UWB
+  const page2 = await browser.newPage();  // Сайт 2 — OBConfigs
 
-  console.log(`Нажимаем кнопку "${startButtonText}"...`);
-  await page.getByRole('button', { name: new RegExp(startButtonText, 'i') }).click({ timeout: 15000 });
+  await page1.setViewportSize({ width: 1280, height: 800 });
+  await page2.setViewportSize({ width: 1280, height: 800 });
 
-  console.log(`Ожидаем ${waitTime/1000} секунд...`);
-  await page.waitForTimeout(waitTime);
+  // Открываем оба сайта одновременно
+  console.log('Открываем оба сайта...');
+  await Promise.all([
+    page1.goto('https://ryzgames31.github.io/UWB/', { waitUntil: 'networkidle', timeout: 60000 }),
+    page2.goto('https://obconfigs.vercel.app/', { waitUntil: 'networkidle', timeout: 60000 })
+  ]);
 
-  console.log(`Ожидаем появления кнопки скачивания "${downloadButtonText}"...`);
-  await page.waitForSelector(`button:has-text("${downloadButtonText}")`, { timeout: 45000 });
+  // Нажимаем кнопки запуска параллельно
+  console.log('Нажимаем кнопки запуска на обоих сайтах...');
+  await Promise.all([
+    page1.getByRole('button', { name: /Начать поиск конфигов/i }).click({ timeout: 15000 }).catch(() => {}),
+    page2.getByRole('button', { name: /Получить конфиги/i }).click({ timeout: 15000 }).catch(() => {})
+  ]);
 
-  console.log(`Нажимаем кнопку скачивания...`);
-  const downloadPromise = page.waitForEvent('download', { timeout: 30000 });
-  await page.getByRole('button', { name: new RegExp(downloadButtonText, 'i') }).click();
+  // Обработка предупреждающего окна только на втором сайте
+  console.log('Проверяем и закрываем предупреждающее окно на втором сайте...');
+  try {
+    await page2.waitForSelector('button:has-text("Продолжить")', { timeout: 8000 });
+    await page2.getByRole('button', { name: /Продолжить/i }).click({ timeout: 10000 });
+    console.log('Кнопка "Продолжить" нажата.');
+  } catch (e) {
+    console.log('Окно подтверждения не найдено (возможно, не требуется).');
+  }
 
-  const download = await downloadPromise;
-  const tempFile = `temp-${Date.now()}.txt`;
-  await download.saveAs(tempFile);
+  // Параллельное ожидание 120 секунд для обоих сайтов
+  console.log('Ожидаем 120 секунд завершения поиска на обоих сайтах параллельно...');
+  await Promise.all([
+    page1.waitForTimeout(120000),
+    page2.waitForTimeout(120000)
+  ]);
 
-  const content = fs.readFileSync(tempFile, 'utf8').trim();
-  fs.unlinkSync(tempFile);
-  await browser.close();
+  // Скачиваем конфиги параллельно
+  console.log('Скачиваем конфиги с обоих сайтов...');
 
-  console.log(`Получено ${content.split('\n').length} строк с сайта ${url}`);
-  return content;
-}
+  const download1Promise = page1.waitForEvent('download', { timeout: 45000 });
+  const download2Promise = page2.waitForEvent('download', { timeout: 45000 });
 
-(async () => {
-  let allConfigs = [];
+  await Promise.all([
+    page1.getByRole('button', { name: /Скачать конфиги/i }).click().catch(() => {}),
+    page2.getByRole('button', { name: /Скачать/i }).click().catch(() => {})
+  ]);
 
-  // === Сайт 1 ===
-  console.log('=== Обработка первого сайта ===');
-  const configs1 = await getConfigsFromSite(
-    'https://ryzgames31.github.io/UWB/',
-    'Начать поиск конфигов',
-    'Скачать конфиги',
-    60000
-  );
-  allConfigs.push(configs1);
+  const [download1, download2] = await Promise.all([download1Promise, download2Promise]);
 
-  // === Сайт 2 ===
-  console.log('\n=== Обработка второго сайта ===');
-  const configs2 = await getConfigsFromSite(
-    'https://obconfigs.vercel.app/',
-    'Получить конфиги',
-    'Скачать',           // основной текст кнопки
-    120000               // увеличено до 120 секунд для второго сайта
-  );
-  allConfigs.push(configs2);
+  await download1.saveAs('configs1.txt');
+  await download2.saveAs('configs2.txt');
 
-  // Объединяем
-  const finalContent = allConfigs.filter(c => c.length > 0).join('\n').trim();
+  // Объединяем результаты
+  const content1 = fs.readFileSync('configs1.txt', 'utf8').trim();
+  const content2 = fs.readFileSync('configs2.txt', 'utf8').trim();
+
+  const finalContent = [content1, content2].filter(c => c.length > 0).join('\n').trim();
   fs.writeFileSync('mobile-whitelist-1.txt', finalContent);
 
   const totalLines = finalContent.split('\n').length;
-  console.log(`\n✅ Успешно объединено и записано ${totalLines} строк в mobile-whitelist-1.txt`);
+  console.log(`✅ Успешно объединено и записано ${totalLines} строк в mobile-whitelist-1.txt`);
+
+  // Очистка
+  fs.unlinkSync('configs1.txt');
+  fs.unlinkSync('configs2.txt');
+  await browser.close();
 
 })().catch(err => {
   console.error('❌ Ошибка:', err.message);
