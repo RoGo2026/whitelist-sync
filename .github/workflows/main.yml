@@ -22,37 +22,60 @@ jobs:
           > mobile-whitelist-1.txt
           
           # ─── Обработка sources.txt ───
-          if [ ! -f sources.txt ]; then
-            echo "sources.txt not found" >&2
-            exit 1
-          fi
-          while IFS= read -r url || [ -n "$url" ]; do
-            [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]] && continue
-            url=$(echo "$url" | xargs)
-            [[ -z "$url" ]] && continue
-            filename=$(basename "$url")
-            if curl -L -f -o "./downloads/$filename" "$url" 2>/dev/null; then
-              grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
-            fi
-          done < sources.txt
-
-          # ─── Обработка Base64.txt (пакетное декодирование) ───
-          if [ -f "Base64.txt" ]; then
-            echo "🔍 Найдено Base64.txt, начинаю декодирование..."
-            while IFS= read -r b64_line || [ -n "$b64_line" ]; do
-              [[ -z "$b64_line" || "$b64_line" =~ ^[[:space:]]*# ]] && continue
-              b64_line=$(echo "$b64_line" | xargs)
-              [[ -z "$b64_line" ]] && continue
-              
-              decoded=$(echo "$b64_line" | base64 -d 2>/dev/null)
-              if [ -n "$decoded" ]; then
-                echo "$decoded" | grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt
+          if [ -f sources.txt ]; then
+            while IFS= read -r url || [ -n "$url" ]; do
+              [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]] && continue
+              url=$(echo "$url" | xargs)
+              [[ -z "$url" ]] && continue
+              filename=$(basename "$url")
+              if curl -L -f -s -o "./downloads/$filename" "$url"; then
+                grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
               fi
+            done < sources.txt
+          fi
+
+          # ─── Обработка Base64.txt (ссылки на файлы с Base64) ───
+          if [ -f "Base64.txt" ]; then
+            echo "🔍 Найдено Base64.txt, обрабатываю ссылки..."
+            counter=1
+            while IFS= read -r b64_url || [ -n "$b64_url" ]; do
+              [[ -z "$b64_url" || "$b64_url" =~ ^[[:space:]]*# ]] && continue
+              b64_url=$(echo "$b64_url" | xargs)
+              [[ -z "$b64_url" ]] && continue
+              
+              echo "📥 Обработка ссылки #$counter: $b64_url"
+              
+              # Скачиваем файл с Base64-данными
+              if curl -L -f -s -o "./downloads/b64_source_$counter.txt" "$b64_url"; then
+                echo "  ✅ Файл скачан, декодирую..."
+                
+                # Пробуем декодировать
+                if base64 -d "./downloads/b64_source_$counter.txt" > "./downloads/b64_decoded_$counter.txt" 2>/dev/null; then
+                  grep -v '^[[:space:]]*#' "./downloads/b64_decoded_$counter.txt" 2>/dev/null | sed '/^$/d' >> mobile-whitelist-1.txt
+                  echo "  ✅ Декодировано успешно"
+                else
+                  # Пробуем с очисткой от пробелов
+                  cat "./downloads/b64_source_$counter.txt" | tr -d '\r\n\t ' | base64 -d 2>/dev/null | \
+                    grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt || \
+                    echo "  ⚠️ Ошибка декодирования"
+                fi
+              else
+                echo "  ❌ Не удалось скачать файл"
+              fi
+              ((counter++))
             done < Base64.txt
+            echo "✅ Обработано ссылок: $((counter-1))"
+          else
+            echo "⚠️ Файл Base64.txt не найден, пропускаю"
           fi
           # ─── Конец обработки ───
 
-          sed -i '/^$/d' mobile-whitelist-1.txt
+          # Финальная очистка: удаляем пустые строки и дубликаты
+          if [ -f mobile-whitelist-1.txt ]; then
+            sort -u mobile-whitelist-1.txt -o mobile-whitelist-1.txt
+            sed -i '/^$/d' mobile-whitelist-1.txt
+            echo "📊 Итоговый файл готов. Строк: $(wc -l < mobile-whitelist-1.txt)"
+          fi
 
       - name: Сохранить файл
         uses: actions/upload-artifact@v4
