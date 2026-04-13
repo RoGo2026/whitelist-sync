@@ -1,5 +1,5 @@
 https://gitflic.ru/project/sigil/my-new-cool-project/blob/raw?file=whitelist&branch=master
-# https://mifa.world/vless
+https://mifa.world/vless
 # https://raw.githubusercontent.com/mheidari98/.proxy/refs/heads/main/all
 
 
