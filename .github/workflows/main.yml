@@ -10,8 +10,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  collect-sources:
+  collect-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -112,77 +113,21 @@ jobs:
             lines=$(wc -l < mobile-whitelist-1.txt)
             echo "📊 Строк в mobile-whitelist-1.txt: $lines"
             if [ "$lines" -gt 0 ]; then
-              echo "📄 Первые 10 строк ПЕРЕД очисткой:"
+              echo "📄 Первые 10 строк:"
               head -10 mobile-whitelist-1.txt
+              echo ""
+              echo "🌍 Список стран в файле:"
+              grep '^vless://' mobile-whitelist-1.txt | sed 's/.*#//' | sort -u | head -15
             fi
-            # НЕ делаем sort -u чтобы не потерять порядок!
             sed -i '/^$/d' mobile-whitelist-1.txt
             echo "✅ Файл очищен от пустых строк"
             final_lines=$(wc -l < mobile-whitelist-1.txt)
             echo "📊 Итоговое количество строк: $final_lines"
-            
-            # ПРОВЕРКА: показываем страны
-            echo "🌍 Список стран в файле:"
-            grep '^vless://' mobile-whitelist-1.txt | sed 's/.*#//' | sort -u | head -15
           else
             echo "❌ Файл mobile-whitelist-1.txt не создан"
           fi
           
-          echo "✅ Процесс завершен успешно"
-
-      - name: Сохранить файл
-        uses: actions/upload-artifact@v4
-        with:
-          name: raw-whitelist
-          path: mobile-whitelist-1.txt
-
-  test-and-filter:
-    needs: collect-sources
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Скачать свежий файл из артефакта
-        uses: actions/download-artifact@v4
-        with:
-          name: raw-whitelist
-          path: ./artifact-download
-
-      - name: Заменить старый файл на новый
-        run: |
-          echo "📁 Текущая директория: $(pwd)"
-          echo "📂 Содержимое папки артефакта:"
-          ls -la ./artifact-download/
-          
-          if [ -f ./artifact-download/mobile-whitelist-1.txt ]; then
-            echo "✅ Копирую свежий файл в корень..."
-            cp -f ./artifact-download/mobile-whitelist-1.txt ./mobile-whitelist-1.txt
-            echo "✅ Файл заменён"
-            echo "📊 Строк в новом файле: $(wc -l < ./mobile-whitelist-1.txt)"
-            echo "🌍 Список стран в СВЕЖЕМ файле:"
-            grep '^vless://' ./mobile-whitelist-1.txt | sed 's/.*#//' | sort -u | head -15
-          else
-            echo "❌ Файл не найден в артефакте!"
-            exit 1
-          fi
-
-      - name: Показать содержимое файла
-        run: |
-          echo "=== СОДЕРЖИМОЕ mobile-whitelist-1.txt (СВЕЖЕЕ) ==="
-          if [ -f mobile-whitelist-1.txt ]; then
-            lines=$(wc -l < mobile-whitelist-1.txt)
-            echo "Всего строк: $lines"
-            if [ "$lines" -gt 0 ]; then
-              echo "📄 Первые 20 строк:"
-              head -20 mobile-whitelist-1.txt
-            else
-              echo "⚠️ Файл пустой!"
-            fi
-          else
-            echo "❌ Файл не найден!"
-          fi
+          echo "✅ Процесс сбора завершен успешно"
 
       - name: Установить Xray
         run: |
