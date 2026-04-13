@@ -1,6 +1,11 @@
-https://raw.githubusercontent.com/Argh94/Proxy-List/main/All_Config.txt
-https://raw.githubusercontent.com/Argh94/Proxy-List/main/ShadowSocks.txt
-https://raw.githubusercontent.com/Argh94/Proxy-List/main/Trojan.txt
+https://raw.githubusercontent.com/LalatinaHub/Mineral/refs/heads/master/result/nodes
+https://raw.githubusercontent.com/expressalaki/ExpressVPN/main/configs.txt
+https://raw.githubusercontent.com/expressalaki/ExpressVPN/main/configs2.txt
+https://raw.githubusercontent.com/expressalaki/ExpressVPN/main/configs3.txt
+https://raw.githubusercontent.com/expressalaki/ExpressVPN/main/configs4.txt
+# https://raw.githubusercontent.com/Argh94/Proxy-List/main/All_Config.txt
+# https://raw.githubusercontent.com/Argh94/Proxy-List/main/ShadowSocks.txt
+# https://raw.githubusercontent.com/Argh94/Proxy-List/main/Trojan.txt
 # https://raw.githubusercontent.com/SoliSpirit/SolVPN/refs/heads/main/all_configs.txt
 # https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector_Py/refs/heads/main/sub/Mix/mix.txt
 # https://raw.githubusercontent.com/FLEXIY0/matryoshka-vpn/refs/heads/main/configs/russia_whitelist.txt
