@@ -30,16 +30,10 @@ const fs = require('fs');
   const download = await downloadPromise;
   await download.saveAs('uwb-configs.txt');
 
-  let configsContent = fs.readFileSync('uwb-configs.txt', 'utf8').trim();
+  const content = fs.readFileSync('uwb-configs.txt', 'utf8').trim();
+  fs.writeFileSync('mobile-whitelist-1.txt', content);
 
-  // Добавляем строку с текущим временем в конец — чтобы Git всегда видел изменение
-  const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '') + ' EEST';
-  configsContent += `\n# Updated: ${timestamp}`;
-
-  fs.writeFileSync('mobile-whitelist-1.txt', configsContent);
-
-  const lineCount = configsContent.split('\n').length;
-  console.log(`✅ Записано ${lineCount} строк в mobile-whitelist-1.txt (с timestamp)`);
+  console.log(`✅ Скачано и подготовлено ${content.split('\n').length} строк`);
 
   fs.unlinkSync('uwb-configs.txt');
   await browser.close();
