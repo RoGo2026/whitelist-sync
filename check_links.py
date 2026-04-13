@@ -7,7 +7,7 @@ import base64
 # ───────── НАСТРОЙКИ ─────────
 INPUT = "mobile-whitelist-1.txt"
 OUTPUT = "working_whitelist.txt"
-MAX_WORKERS = 30
+MAX_WORKERS = 15
 TEST_TIMEOUT = 3
 MAX_LATENCY_MS = 2000
 # ─────────────────────────────
