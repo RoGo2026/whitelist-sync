@@ -46,7 +46,7 @@ jobs:
           fi
           echo ""
 
-          # ─── Обработка Base64.txt (ДВУХУРОВНЕВАЯ СИСТЕМА + ИЗВЛЕЧЕНИЕ ХОСТОВ) ───
+          # ─── Обработка Base64.txt (ДВУХУРОВНЕВАЯ СИСТЕМА) ───
           if [ -f "Base64.txt" ]; then
             echo "✅ Файл Base64.txt найден"
             
@@ -87,37 +87,24 @@ jobs:
                         
                         inner_size=$(wc -c < "./downloads/inner_${counter}_${link_counter}.txt")
                         if [ "$inner_size" -gt 0 ]; then
-                          echo "      ✅ Скачано ($inner_size байт)"
-                          
-                          # Извлекаем VLESS-ссылки и парсим хосты
-                          echo "      🔍 Извлекаю хосты из VLESS-ссылок..."
+                          echo "      ✅ Скачано ($inner_size байт), обрабатываю содержимое..."
                           
                           # Читаем файл и обрабатываем каждую строку
                           while IFS= read -r line || [ -n "$line" ]; do
                             [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
                             
-                            # Если это VLESS-ссылка
+                            # Если это VLESS-ссылка — просто добавляем её в файл
                             if [[ "$line" =~ ^vless:// ]]; then
-                              # Извлекаем хост разными способами
-                              # Формат 1: vless://uuid@host:port...
-                              host=$(echo "$line" | sed 's|vless://[^@]*@||' | sed 's|[:/?].*||')
-                              
-                              # Формат 2: ищем sni= параметр
-                              if [ -z "$host" ] || [[ "$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                                sni_host=$(echo "$line" | grep -oP 'sni=\K[^&]+' || true)
-                                if [ -n "$sni_host" ]; then
-                                  host="$sni_host"
-                                fi
-                              fi
-                              
-                              # Добавляем хост если нашли
-                              if [ -n "$host" ] && [[ ! "$host" =~ ^[0-9]+$ ]]; then
-                                echo "$host" >> mobile-whitelist-1.txt
-                                echo "        ✅ Добавлен хост: $host"
-                              fi
-                            else
-                              # Если не VLESS, просто добавляем строку (может быть домен/IP)
                               echo "$line" >> mobile-whitelist-1.txt
+                              # Извлекаем название для отображения
+                              country=$(echo "$line" | grep -oP '#\K.*$' || echo "Unknown")
+                              echo "        ✅ Добавлена VLESS-ссылка ($country)"
+                            else
+                              # Если не VLESS, проверяем — может быть это домен/IP
+                              if [[ "$line" =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,} ]] || [[ "$line" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                                echo "$line" >> mobile-whitelist-1.txt
+                                echo "        ✅ Добавлен хост: $line"
+                              fi
                             fi
                           done < "./downloads/inner_${counter}_${link_counter}.txt"
                           
@@ -125,7 +112,7 @@ jobs:
                           echo "      ⚠️ Файл пустой"
                         fi
                       else
-                        echo "      ❌ Не удалось скачать"
+                        echo "      ❌ Не удалось скачать файл"
                       fi
                       ((link_counter++))
                     done < "./downloads/links_list_$counter.txt"
@@ -153,8 +140,8 @@ jobs:
             lines=$(wc -l < mobile-whitelist-1.txt)
             echo "📊 Строк в mobile-whitelist-1.txt: $lines"
             if [ "$lines" -gt 0 ]; then
-              echo "📄 Первые 20 строк:"
-              head -20 mobile-whitelist-1.txt
+              echo "📄 Первые 10 строк:"
+              head -10 mobile-whitelist-1.txt
             fi
             sort -u mobile-whitelist-1.txt -o mobile-whitelist-1.txt
             sed -i '/^$/d' mobile-whitelist-1.txt
