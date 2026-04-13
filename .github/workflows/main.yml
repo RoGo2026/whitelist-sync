@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT }}     # ← используем ваш Personal Access Token
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
