@@ -2,7 +2,7 @@ name: Fetch UWB Configs → GitVerse (mobile-whitelist-1.txt)
 
 on:
   schedule:
-    - cron: '0 */2 * * *'     # каждые 2 часа
+    - cron: '0 */1 * * *'     # каждые 60 минут (можно вернуть */2)
   workflow_dispatch:
 
 jobs:
@@ -36,15 +36,18 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           
-          if [ -f mobile-whitelist-1.txt ]; then
-            git add mobile-whitelist-1.txt
-            if git diff --cached --quiet; then
-              echo "No changes detected"
-            else
-              git commit -m "Update mobile-whitelist-1.txt from UWB site $(date +'%Y-%m-%d %H:%M:%S EEST')"
-              git push
-            fi
+          echo "=== Git status before ==="
+          git status
+          
+          git add -f mobile-whitelist-1.txt   # -f = force add
+          
+          echo "=== Git diff after add ==="
+          git diff --cached --stat
+          
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
           else
-            echo "Target file not found"
-            exit 1
+            git commit -m "Update mobile-whitelist-1.txt from UWB site $(date +'%Y-%m-%d %H:%M:%S EEST')"
+            git push
+            echo "✅ Successfully pushed to GitVerse"
           fi
