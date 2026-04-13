@@ -17,117 +17,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Скачать источники
+      - name: Скачать и обработать источники
         run: |
           mkdir -p ./downloads
           > mobile-whitelist-1.txt
           
-          echo "=== ПРОВЕРКА ФАЙЛОВ ==="
-          ls -la
-          echo ""
-          
-          # ─── Обработка sources.txt ───
-          if [ -f sources.txt ]; then
-            echo "✅ Файл sources.txt найден"
-            while IFS= read -r url || [ -n "$url" ]; do
-              [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]] && continue
-              url=$(echo "$url" | xargs)
-              [[ -z "$url" ]] && continue
-              filename=$(basename "$url")
-              echo "📥 Скачиваю: $url"
-              if curl -L -f -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -o "./downloads/$filename" "$url"; then
-                grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
-                echo "  ✅ Добавлено в список"
-              else
-                echo "  ❌ Ошибка скачивания"
-              fi
-            done < sources.txt
-          else
-            echo "⚠️ Файл sources.txt не найден"
-          fi
-          echo ""
-
-          # ─── Обработка Base64.txt (ПРЯМОЕ ДОБАВЛЕНИЕ VLESS-ССЫЛОК) ───
+          # Обработка Base64.txt
           if [ -f "Base64.txt" ]; then
-            echo "✅ Файл Base64.txt найден"
-            
-            counter=1
             while IFS= read -r b64_url || [ -n "$b64_url" ]; do
               [[ -z "$b64_url" || "$b64_url" =~ ^[[:space:]]*# ]] && continue
               b64_url=$(echo "$b64_url" | xargs)
-              [[ -z "$b64_url" ]] && continue
               
-              echo "📥 Обработка ссылки #$counter: $b64_url"
-              
-              # Скачиваем Base64-файл
-              if curl -L -f -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
-                -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" \
-                -o "./downloads/b64_raw_$counter.txt" "$b64_url"; then
-                
-                file_size=$(wc -c < "./downloads/b64_raw_$counter.txt")
-                echo "  ✅ Base64-файл скачан, размер: $file_size байт"
-                
-                if [ "$file_size" -gt 0 ]; then
-                  # Декодируем Base64 → получаем VLESS-ссылки
-                  if base64 -d "./downloads/b64_raw_$counter.txt" > "./downloads/vless_links_$counter.txt" 2>/dev/null; then
-                    echo "  ✅ Base64 декодирован, добавляю VLESS-ссылки..."
-                    
-                    # Показываем что нашли
-                    echo "  📄 Найденные VLESS-ссылки:"
-                    grep '^vless://' "./downloads/vless_links_$counter.txt" | head -5 | while read -r vless_line; do
-                      country=$(echo "$vless_line" | sed 's/.*#//' | head -c 60)
-                      echo "    - $country"
-                    done
-                    
-                    # Просто добавляем все VLESS-ссылки в файл (НЕ скачиваем их!)
-                    grep '^vless://' "./downloads/vless_links_$counter.txt" >> mobile-whitelist-1.txt || true
-                    
-                    vless_count=$(grep -c '^vless://' "./downloads/vless_links_$counter.txt" || echo "0")
-                    echo "  ✅ Всего добавлено VLESS-ссылок: $vless_count"
-                  else
-                    echo "  ⚠️ Ошибка декодирования Base64, пробую альтернативный метод..."
-                    cat "./downloads/b64_raw_$counter.txt" | tr -d '\r\n\t ' | base64 -d > "./downloads/vless_links_$counter.txt" 2>/dev/null || true
-                    if [ -s "./downloads/vless_links_$counter.txt" ]; then
-                      grep '^vless://' "./downloads/vless_links_$counter.txt" >> mobile-whitelist-1.txt || true
-                      vless_count=$(grep -c '^vless://' "./downloads/vless_links_$counter.txt" || echo "0")
-                      echo "  ✅ Добавлено VLESS-ссылок (альт. метод): $vless_count"
-                    fi
-                  fi
-                else
-                  echo "  ⚠️ Файл пустой"
+              # Скачиваем и декодируем Base64
+              if curl -L -f -s -A "Mozilla/5.0" -o "./downloads/b64.txt" "$b64_url"; then
+                if base64 -d "./downloads/b64.txt" 2>/dev/null | grep '^vless://' >> mobile-whitelist-1.txt; then
+                  echo "✅ VLESS-ссылки добавлены"
                 fi
-              else
-                echo "  ❌ Не удалось скачать Base64-файл"
               fi
-              ((counter++))
             done < Base64.txt
-            echo "✅ Обработано ссылок из Base64.txt: $((counter-1))"
-          else
-            echo "⚠️ Файл Base64.txt не найден"
-          fi
-          echo ""
-
-          # Финальная статистика
-          echo "=== ИТОГОВАЯ СТАТИСТИКА ==="
-          if [ -f mobile-whitelist-1.txt ]; then
-            lines=$(wc -l < mobile-whitelist-1.txt)
-            echo "📊 Строк в mobile-whitelist-1.txt: $lines"
-            if [ "$lines" -gt 0 ]; then
-              echo "📄 Первые 10 строк:"
-              head -10 mobile-whitelist-1.txt
-              echo ""
-              echo "🌍 Список стран в файле:"
-              grep '^vless://' mobile-whitelist-1.txt | sed 's/.*#//' | sort -u | head -15
-            fi
-            sed -i '/^$/d' mobile-whitelist-1.txt
-            echo "✅ Файл очищен от пустых строк"
-            final_lines=$(wc -l < mobile-whitelist-1.txt)
-            echo "📊 Итоговое количество строк: $final_lines"
-          else
-            echo "❌ Файл mobile-whitelist-1.txt не создан"
           fi
           
-          echo "✅ Процесс сбора завершен успешно"
+          # Очистка файла
+          sed -i '/^$/d' mobile-whitelist-1.txt
+          echo "📊 Всего ссылок: $(wc -l < mobile-whitelist-1.txt)"
 
       - name: Установить Xray
         run: |
@@ -149,7 +61,5 @@ jobs:
             git config user.name "GitHub Action Bot"
             git config user.email "action@noreply.github.com"
             git add mobile-whitelist-1.txt
-            git commit -m "auto update $(date -u +'%Y-%m-%d %H:%M:%S UTC')" && git push && echo "Pushed" || echo "No changes"
-          else
-            echo "Empty result, skip push"
+            git commit -m "auto update $(date -u +'%Y-%m-%d %H:%M:%S UTC')" && git push || echo "No changes"
           fi
