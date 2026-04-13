@@ -1,8 +1,8 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
 
-(async () => {
-  console.log('Запуск браузера...');
+async function getConfigsFromSite(url, startButtonText, downloadButtonText, waitTime = 90000) {
+  console.log(`Открываем сайт: ${url}`);
   const browser = await chromium.launch({ 
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox']
@@ -11,32 +11,60 @@ const fs = require('fs');
   const page = await browser.newPage();
   await page.setViewportSize({ width: 1280, height: 800 });
 
-  console.log('Открываем сайт...');
-  await page.goto('https://ryzgames31.github.io/UWB/', { 
-    waitUntil: 'networkidle', 
-    timeout: 60000 
-  });
+  await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
 
-  console.log('Нажимаем "Начать поиск конфигов"...');
-  await page.getByRole('button', { name: /Начать поиск конфигов/i }).click();
+  console.log(`Нажимаем кнопку "${startButtonText}"...`);
+  await page.getByRole('button', { name: new RegExp(startButtonText, 'i') }).click({ timeout: 15000 });
 
-  console.log('Ожидаем 60 секунд...');
-  await page.waitForTimeout(60000);
+  console.log(`Ожидаем ${waitTime/1000} секунд завершения поиска...`);
+  await page.waitForTimeout(waitTime);
 
-  console.log('Скачиваем конфиги...');
-  const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: /Скачать конфиги/i }).click();
-  
+  console.log(`Нажимаем кнопку "${downloadButtonText}"...`);
+  const downloadPromise = page.waitForEvent('download', { timeout: 30000 });
+  await page.getByRole('button', { name: new RegExp(downloadButtonText, 'i') }).click();
+
   const download = await downloadPromise;
-  await download.saveAs('uwb-configs.txt');
+  const tempFile = `temp-${Date.now()}.txt`;
+  await download.saveAs(tempFile);
 
-  const content = fs.readFileSync('uwb-configs.txt', 'utf8').trim();
-  fs.writeFileSync('mobile-whitelist-1.txt', content);
-
-  console.log(`✅ Скачано и подготовлено ${content.split('\n').length} строк`);
-
-  fs.unlinkSync('uwb-configs.txt');
+  const content = fs.readFileSync(tempFile, 'utf8').trim();
+  fs.unlinkSync(tempFile);
   await browser.close();
+
+  console.log(`Получено ${content.split('\n').length} строк с сайта ${url}`);
+  return content;
+}
+
+(async () => {
+  let allConfigs = [];
+
+  // Сайт 1
+  console.log('=== Обработка первого сайта ===');
+  const configs1 = await getConfigsFromSite(
+    'https://ryzgames31.github.io/UWB/',
+    'Начать поиск конфигов',
+    'Скачать конфиги',
+    90000
+  );
+  allConfigs.push(configs1);
+
+  // Сайт 2
+  console.log('\n=== Обработка второго сайта ===');
+  const configs2 = await getConfigsFromSite(
+    'https://obconfigs.vercel.app/',
+    'Получить конфиги',
+    'Скачать',
+    90000
+  );
+  allConfigs.push(configs2);
+
+  // Объединяем и сохраняем
+  const finalContent = allConfigs.filter(c => c.length > 0).join('\n').trim();
+  fs.writeFileSync('mobile-whitelist-1.txt', finalContent);
+
+  const totalLines = finalContent.split('\n').length;
+  console.log(`\n✅ Успешно объединено и записано ${totalLines} строк в mobile-whitelist-1.txt`);
+
 })().catch(err => {
   console.error('❌ Ошибка:', err.message);
   process.exit(1);
