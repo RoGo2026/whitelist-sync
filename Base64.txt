@@ -1,3 +1,3 @@
-https://gitflic.ru/project/sigil/my-new-cool-project/blob/raw?file=whitelist&branch=master
+# https://gitflic.ru/project/sigil/my-new-cool-project/blob/raw?file=whitelist&branch=master
 # https://mifa.world/vless
 
