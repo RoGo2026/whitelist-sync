@@ -4,9 +4,13 @@ from urllib.parse import urlparse, parse_qs, unquote
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import base64
 
+# ───────── НАСТРОЙКИ ─────────
 INPUT = "mobile-whitelist-1.txt"
 OUTPUT = "working_whitelist.txt"
-WORKERS = 20
+MAX_WORKERS = 20             # Количество потоков
+TEST_TIMEOUT = 2             # Таймаут подключения (сек)
+MAX_LATENCY_MS = 1000        # Максимальный пинг для пропуска ссылки
+# ─────────────────────────────
 
 def parse_link(link):
     try:
@@ -92,14 +96,26 @@ def test_proxy(link, port):
     except:
         result["reason"] = "extract"
         return result
-    ok, lat = tcp_check(h, p, 2.5)
-    if not ok or lat is None or lat > 700:
+    
+    # TCP проверка с таймаутом
+    ok, lat = tcp_check(h, p, TEST_TIMEOUT)
+    if not ok or lat is None:
         result["reason"] = "tcp"
         return result
+    
+    # Проверка пинга
+    if lat > MAX_LATENCY_MS:
+        result["reason"] = "slow"
+        result["latency"] = lat
+        return result
+    
     result["latency"] = lat
-    if not tls_check(h, p, 3.0):
+    
+    # TLS проверка с таймаутом
+    if not tls_check(h, p, TEST_TIMEOUT):
         result["reason"] = "tls"
         return result
+    
     result["ok"] = True
     result["reason"] = "ok"
     return result
@@ -117,8 +133,9 @@ def main():
             open(OUTPUT, "w").close()
             return
         print(f"Checking {len(links)} proxies...")
+        print(f"Settings: workers={MAX_WORKERS}, timeout={TEST_TIMEOUT}s, max_latency={MAX_LATENCY_MS}ms")
         working = []
-        with ThreadPoolExecutor(max_workers=WORKERS) as ex:
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
             futs = {ex.submit(test_proxy, ln, 12000 + i): ln for i, ln in enumerate(links)}
             for fut in as_completed(futs):
                 r = fut.result()
