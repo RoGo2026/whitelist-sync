@@ -20,6 +20,8 @@ jobs:
         run: |
           mkdir -p ./downloads
           > mobile-whitelist-1.txt
+          
+          # ─── Обработка sources.txt ───
           if [ ! -f sources.txt ]; then
             echo "sources.txt not found" >&2
             exit 1
@@ -33,10 +35,23 @@ jobs:
               grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
             fi
           done < sources.txt
-          BASE64_URL="https://gitflic.ru/project/sigil/my-new-cool-project/blob/raw?file=whitelist&branch=master"
-          if curl -L -f -o "./downloads/gitflic.txt" "$BASE64_URL" 2>/dev/null; then
-            base64 --decode "./downloads/gitflic.txt" 2>/dev/null | grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt
+
+          # ─── Обработка Base64.txt (пакетное декодирование) ───
+          if [ -f "Base64.txt" ]; then
+            echo "🔍 Найдено Base64.txt, начинаю декодирование..."
+            while IFS= read -r b64_line || [ -n "$b64_line" ]; do
+              [[ -z "$b64_line" || "$b64_line" =~ ^[[:space:]]*# ]] && continue
+              b64_line=$(echo "$b64_line" | xargs)
+              [[ -z "$b64_line" ]] && continue
+              
+              decoded=$(echo "$b64_line" | base64 -d 2>/dev/null)
+              if [ -n "$decoded" ]; then
+                echo "$decoded" | grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt
+              fi
+            done < Base64.txt
           fi
+          # ─── Конец обработки ───
+
           sed -i '/^$/d' mobile-whitelist-1.txt
 
       - name: Сохранить файл
