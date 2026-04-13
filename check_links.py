@@ -8,7 +8,7 @@ import base64
 INPUT = "mobile-whitelist-1.txt"
 OUTPUT = "working_whitelist.txt"
 MAX_WORKERS = 20             # Количество потоков
-TEST_TIMEOUT = 2             # Таймаут подключения (сек)
+TEST_TIMEOUT = 4             # Таймаут подключения (сек)
 MAX_LATENCY_MS = 1000        # Максимальный пинг для пропуска ссылки
 # ─────────────────────────────
 
