@@ -1,83 +1,39 @@
-name: Скачивать, проверять и обновлять mobile-whitelist-1.txt на GitVerse
+name: Fetch UWB Configs (Whitelist Bypass)
 
 on:
   schedule:
-    - cron: '*/40 * * * *'
-  workflow_dispatch:
-
-concurrency:
-  group: ${{ github.workflow }}
-  cancel-in-progress: true
+    - cron: '0 */2 * * *'     # каждые 2 часа (можно изменить)
+  workflow_dispatch:          # можно запускать вручную
 
 jobs:
-  collect-and-test:
+  fetch-configs:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Скачать и обработать источники
-        run: |
-          mkdir -p ./downloads
-          > mobile-whitelist-1.txt
-          
-          # ─── Обработка sources.txt (обычные ссылки) ───
-          if [ -f sources.txt ]; then
-            echo "📥 Обработка sources.txt..."
-            while IFS= read -r url || [ -n "$url" ]; do
-              [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]] && continue
-              url=$(echo "$url" | xargs)
-              [[ -z "$url" ]] && continue
-              
-              filename=$(basename "$url")
-              if curl -L -f -s -o "./downloads/$filename" "$url"; then
-                grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
-                echo "  ✅ Добавлено: $url"
-              fi
-            done < sources.txt
-          fi
-          
-          # ─── Обработка Base64.txt (Base64-ссылки) ───
-          if [ -f Update Base64.txt ]; then
-            echo "📥 Обработка Base64.txt..."
-            while IFS= read -r b64_url || [ -n "$b64_url" ]; do
-              [[ -z "$b64_url" || "$b64_url" =~ ^[[:space:]]*# ]] && continue
-              b64_url=$(echo "$b64_url" | xargs)
-              
-              # Скачиваем и декодируем Base64
-              if curl -L -f -s -A "Mozilla/5.0" -o "./downloads/b64.txt" "$b64_url"; then
-                if base64 -d "./downloads/b64.txt" 2>/dev/null | grep '^vless://' >> mobile-whitelist-1.txt; then
-                  echo "  ✅ VLESS-ссылки из: $b64_url"
-                fi
-              fi
-            done < Base64.txt
-          fi
-          
-          # Очистка файла
-          sed -i '/^$/d' mobile-whitelist-1.txt
-          sort -u mobile-whitelist-1.txt -o mobile-whitelist-1.txt
-          echo "📊 Всего ссылок: $(wc -l < mobile-whitelist-1.txt)"
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-      - name: Установить Xray
+      - name: Install Playwright
         run: |
-          wget -q https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip
-          unzip -q Xray-linux-64.zip
-          chmod +x xray
-          sudo mv xray /usr/local/bin/
+          npm init -y
+          npm install playwright
 
-      - name: Проверка ссылок
-        run: python3 check_links.py
+      - name: Run automation script
+        run: node fetch-configs.js
 
-      - name: Обновить GitVerse
+      - name: Commit and push if changed
         run: |
-          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo 2>/dev/null || true
-          if [ -f working_whitelist.txt ] && [ -s working_whitelist.txt ]; then
-            cp -f working_whitelist.txt ./repo/mobile-whitelist-1.txt
-            echo "# Updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./repo/mobile-whitelist-1.txt
-            cd ./repo
-            git config user.name "GitHub Action Bot"
-            git config user.email "action@noreply.github.com"
-            git add mobile-whitelist-1.txt
-            git commit -m "auto update $(date -u +'%Y-%m-%d %H:%M:%S UTC')" && git push || echo "No changes"
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add uwb-configs.txt
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update UWB configs $(date +'%Y-%m-%d %H:%M:%S EEST')"
+            git push
           fi
