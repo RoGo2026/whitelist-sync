@@ -21,22 +21,42 @@ jobs:
           mkdir -p ./downloads
           > mobile-whitelist-1.txt
           
+          echo "=== ПРОВЕРКА ФАЙЛОВ ==="
+          ls -la
+          echo ""
+          
           # ─── Обработка sources.txt ───
           if [ -f sources.txt ]; then
+            echo "✅ Файл sources.txt найден"
+            echo "Содержимое sources.txt:"
+            cat sources.txt
+            echo ""
+            
             while IFS= read -r url || [ -n "$url" ]; do
               [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]] && continue
               url=$(echo "$url" | xargs)
               [[ -z "$url" ]] && continue
               filename=$(basename "$url")
+              echo "📥 Скачиваю: $url"
               if curl -L -f -s -o "./downloads/$filename" "$url"; then
                 grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
+                echo "  ✅ Добавлено в список"
+              else
+                echo "  ❌ Ошибка скачивания"
               fi
             done < sources.txt
+          else
+            echo "⚠️ Файл sources.txt не найден"
           fi
+          echo ""
 
           # ─── Обработка Base64.txt (ссылки, возвращающие Base64 с данными) ───
           if [ -f "Base64.txt" ]; then
-            echo "🔍 Найдено Base64.txt, обрабатываю ссылки..."
+            echo "✅ Файл Base64.txt найден"
+            echo "Содержимое Base64.txt:"
+            cat Base64.txt
+            echo ""
+            
             counter=1
             while IFS= read -r b64_url || [ -n "$b64_url" ]; do
               [[ -z "$b64_url" || "$b64_url" =~ ^[[:space:]]*# ]] && continue
@@ -47,38 +67,54 @@ jobs:
               
               # Скачиваем содержимое (оно в формате Base64)
               if curl -L -f -s -o "./downloads/b64_raw_$counter.txt" "$b64_url"; then
-                echo "  ✅ Файл скачан, декодирую Base64..."
+                echo "  ✅ Файл скачан, размер: $(wc -c < "./downloads/b64_raw_$counter.txt") байт"
+                echo "  📄 Первые 100 символов:"
+                head -c 100 "./downloads/b64_raw_$counter.txt"
+                echo ""
                 
                 # Декодируем Base64 → получаем чистые строки (VLESS-ссылки)
-                # Пробуем стандартное декодирование всего файла
                 if base64 -d "./downloads/b64_raw_$counter.txt" > "./downloads/decoded_$counter.txt" 2>/dev/null; then
-                  # Извлекаем только полезные строки (пропускаем комментарии и пустоты)
+                  echo "  ✅ Base64 декодирован успешно"
+                  echo "  📄 Декодированное содержимое (первые 5 строк):"
+                  head -5 "./downloads/decoded_$counter.txt"
+                  
+                  # Извлекаем только полезные строки
                   grep -v '^[[:space:]]*#' "./downloads/decoded_$counter.txt" 2>/dev/null | sed '/^$/d' >> mobile-whitelist-1.txt
-                  echo "  ✅ Декодировано успешно"
+                  echo "  ✅ Добавлено в mobile-whitelist-1.txt"
                 else
-                  # Пробуем режим совместимости: удаляем пробелы/переносы перед декодированием
-                  echo "  ⚠️ Пробую режим совместимости..."
-                  cat "./downloads/b64_raw_$counter.txt" | tr -d '\r\n\t ' | base64 -d 2>/dev/null | \
-                    grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt && \
-                    echo "  ✅ Декодировано в режиме совместимости" || \
+                  echo "  ⚠️ Стандартное декодирование не сработало, пробую режим совместимости..."
+                  if cat "./downloads/b64_raw_$counter.txt" | tr -d '\r\n\t ' | base64 -d > "./downloads/decoded_$counter.txt" 2>/dev/null; then
+                    echo "  ✅ Декодировано в режиме совместимости"
+                    grep -v '^[[:space:]]*#' "./downloads/decoded_$counter.txt" 2>/dev/null | sed '/^$/d' >> mobile-whitelist-1.txt
+                  else
                     echo "  ❌ Ошибка декодирования"
+                  fi
                 fi
               else
-                echo "  ❌ Не удалось скачать файл по ссылке"
+                echo "  ❌ Не удалось скачать файл"
               fi
               ((counter++))
             done < Base64.txt
             echo "✅ Обработано ссылок из Base64.txt: $((counter-1))"
           else
-            echo "⚠️ Файл Base64.txt не найден, пропускаю этот этап"
+            echo "⚠️ Файл Base64.txt не найден"
           fi
-          # ─── Конец обработки ───
+          echo ""
 
-          # Финальная очистка: удаляем пустые строки и дубликаты
+          # Финальная статистика
+          echo "=== ИТОГОВАЯ СТАТИСТИКА ==="
           if [ -f mobile-whitelist-1.txt ]; then
+            lines=$(wc -l < mobile-whitelist-1.txt)
+            echo "📊 Строк в mobile-whitelist-1.txt: $lines"
+            if [ "$lines" -gt 0 ]; then
+              echo "📄 Первые 5 строк:"
+              head -5 mobile-whitelist-1.txt
+            fi
             sort -u mobile-whitelist-1.txt -o mobile-whitelist-1.txt
             sed -i '/^$/d' mobile-whitelist-1.txt
-            echo "📊 Итоговый файл готов. Строк: $(wc -l < mobile-whitelist-1.txt)"
+            echo "✅ Файл очищен от дубликатов и пустых строк"
+          else
+            echo "❌ Файл mobile-whitelist-1.txt не создан"
           fi
 
       - name: Сохранить файл
@@ -99,6 +135,21 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: raw-whitelist
+
+      - name: Показать содержимое файла
+        run: |
+          echo "=== СОДЕРЖИМОЕ mobile-whitelist-1.txt ==="
+          if [ -f mobile-whitelist-1.txt ]; then
+            lines=$(wc -l < mobile-whitelist-1.txt)
+            echo "Всего строк: $lines"
+            if [ "$lines" -gt 0 ]; then
+              head -20 mobile-whitelist-1.txt
+            else
+              echo "⚠️ Файл пустой!"
+            fi
+          else
+            echo "❌ Файл не найден"
+          fi
 
       - name: Установить Xray
         run: |
