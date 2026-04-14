@@ -1,5 +1,5 @@
-https://raw.githubusercontent.com/ShadowException/VPN/refs/heads/main/configs/VPN-cat
-# https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist
+https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist
+# https://raw.githubusercontent.com/ShadowException/VPN/refs/heads/main/configs/VPN-cat
 # https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt
 # https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/14.txt
 # https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/12.txt
