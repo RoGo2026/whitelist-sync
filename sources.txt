@@ -1,10 +1,10 @@
 https://raw.githubusercontent.com/ksenkovsolo/HardVPN-bypass-WhiteLists-/refs/heads/main/vpn-lte/WHITELIST-ALL.txt
 https://raw.githubusercontent.com/expressalaki/ExpressVPN/main/configs.txt
 https://raw.githubusercontent.com/expressalaki/ExpressVPN/main/configs4.txt
-https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist
+https://raw.githubusercontent.com/ShadowException/VPN/refs/heads/main/configs/VPN-cat
+# https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist
 # https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt
 # https://raw.githubusercontent.com/RKPchannel/RKP_bypass_configs/refs/heads/main/configs/url_work.txt
-# https://raw.githubusercontent.com/ShadowException/VPN/refs/heads/main/configs/VPN-cat
 # https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/14.txt
 # https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/12.txt
 # https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/2.txt
