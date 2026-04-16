@@ -1,8 +1,8 @@
-https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist
-https://raw.githubusercontent.com/ShadowException/VPN/refs/heads/main/configs/VPN-cat
+https://raw.githubusercontent.com/zieng2/wl/refs/heads/main/vless_universal.txt
+# https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist
+# https://raw.githubusercontent.com/ShadowException/VPN/refs/heads/main/configs/VPN-cat
 # https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt
 # https://raw.githubusercontent.com/SoliSpirit/SolVPN/refs/heads/main/all_configs.txt
-# https://raw.githubusercontent.com/zieng2/wl/refs/heads/main/vless_universal.txt
 # https://raw.githubusercontent.com/ksenkovsolo/HardVPN-bypass-WhiteLists-/refs/heads/main/vpn-lte/WHITELIST-ALL.txt
 # https://raw.githubusercontent.com/expressalaki/ExpressVPN/main/configs.txt
 # https://raw.githubusercontent.com/expressalaki/ExpressVPN/main/configs4.txt
