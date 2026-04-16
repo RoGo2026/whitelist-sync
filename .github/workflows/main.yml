@@ -1,135 +1,64 @@
-name: Скачивать, проверять и обновлять mobile-whitelist-1.txt на GitVerse
+name: Fetch UWB Configs → GitVerse (mobile-whitelist-1.txt)
 
 on:
   schedule:
-    - cron: '*/40 * * * *'
+    - cron: '0 */1 * * *'     # каждые 60 минут
   workflow_dispatch:
 
-# Защита от одновременных запусков (cron + AutoHotkey)
-concurrency:
-  group: ${{ github.workflow }}
-  cancel-in-progress: true
-
 jobs:
-  collect-sources:
+  fetch-and-push:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout GitHub repository
         uses: actions/checkout@v4
 
-      - name: Скачать источники и создать чистый mobile-whitelist-1.txt
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          # cache: 'npm'   ← убрали, чтобы избежать ошибки
+
+      - name: Install dependencies
         run: |
-          mkdir -p ./downloads
-          > mobile-whitelist-1.txt
+          npm init -y
+          npm install playwright
+          npm install   # создаёт package-lock.json
 
-          if [ ! -f sources.txt ]; then
-            echo "Ошибка: файл sources.txt не найден в корне репозитория!" >&2
-            exit 1
-          fi
+      - name: Cache Playwright Browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: |
+            ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-chromium-v2
+          restore-keys: |
+            playwright-${{ runner.os }}-chromium-
 
-          echo "Обработка обычных источников из sources.txt..."
+      - name: Install Playwright Browsers (только если нет в кэше)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
 
-          while IFS= read -r url || [ -n "$url" ]; do
-            if [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]]; then
-              continue
-            fi
-            url=$(echo "$url" | xargs)
-            if [[ -n "$url" ]]; then
-              filename=$(basename "$url")
-              if curl -L -f --fail-early -o "./downloads/$filename" "$url"; then
-                grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
-                echo "Добавлено: $url"
-              else
-                echo "Ошибка скачивания: $url" >&2
-              fi
-            fi
-          done < sources.txt
+      - name: Запуск скачивания конфигов с сайта
+        run: node fetch-configs.js
 
-          # 🔁 Декодирование Base64-ссылок из файла Base64.txt
-          echo "Обработка Base64-источников..."
-          BASE64_LIST="./Base64.txt"
+      - name: Отправка файла на GitVerse
+        run: |
+          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./gitverse-repo
           
-          if [ -f "$BASE64_LIST" ]; then
-            while IFS= read -r b64_url || [ -n "$b64_url" ]; do
-              # Пропускаем пустые строки и комментарии
-              if [[ -z "$b64_url" || "$b64_url" =~ ^[[:space:]]*# ]]; then
-                continue
-              fi
-              b64_url=$(echo "$b64_url" | xargs)
-              if [[ -n "$b64_url" ]]; then
-                echo "Декодирование: $b64_url"
-                if curl -L -f --fail-early -s -o "./downloads/b64_raw.txt" "$b64_url"; then
-                  # Декодируем и фильтруем
-                  base64 --decode "./downloads/b64_raw.txt" 2>/dev/null | grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt
-                  echo "✓ Успешно декодировано: $b64_url"
-                else
-                  echo "⚠ Ошибка скачивания Base64: $b64_url" >&2
-                fi
-              fi
-            done < "$BASE64_LIST"
-          else
-            echo "⚠ Файл $BASE64_LIST не найден, пропускаем этап Base64"
-          fi
-
-          # Финальная очистка: удаляем пустые строки
-          sed -i '/^$/d' mobile-whitelist-1.txt
-          echo "✅ Сборка завершена. Строк в файле: $(wc -l < mobile-whitelist-1.txt)"
-
-      - name: Сохранить собранный файл для проверки
-        uses: actions/upload-artifact@v4
-        with:
-          name: raw-whitelist
-          path: mobile-whitelist-1.txt
-
-  test-and-filter:
-    needs: collect-sources
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Скачать собранный файл
-        uses: actions/download-artifact@v4
-        with:
-          name: raw-whitelist
-
-      - name: Скачать и установить Xray-core
-        run: |
-          wget -q https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip -O xray.zip
-          unzip -q xray.zip
-          chmod +x xray
-          sudo mv xray /usr/local/bin/
-          echo "Xray-core установлен: $(xray version | head -n 1)"
-
-      - name: Запустить проверку ссылок через Xray-core
-        run: python3 check_links.py
-
-      - name: Обновить файл на GitVerse (только рабочие ссылки)
-        run: |
-          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
-
-          # Копируем файл с рабочими ссылками
-          if [ -f working_whitelist.txt ]; then
-            cp -f working_whitelist.txt ./repo/mobile-whitelist-1.txt
-          else
-            cp -f mobile-whitelist-1.txt ./repo/mobile-whitelist-1.txt
-          fi
-
-          # Принудительное обновление времени
-          echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./repo/mobile-whitelist-1.txt
-
-          cd ./repo
+          cp -f mobile-whitelist-1.txt ./gitverse-repo/mobile-whitelist-1.txt
+          
+          echo "# Last updated: $(date +'%Y-%m-%d %H:%M:%S EEST')" >> ./gitverse-repo/mobile-whitelist-1.txt
+          
+          cd ./gitverse-repo
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
           
           git add mobile-whitelist-1.txt
           
-          if git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
+          if git commit -m "Update mobile-whitelist-1.txt from UWB site $(date +'%Y-%m-%d %H:%M:%S EEST')"; then
             git push
-            echo "✅ Файл с проверенными ссылками успешно отправлен на GitVerse"
+            echo "✅ Файл успешно отправлен на GitVerse"
           else
-            echo "Нет изменений после проверки"
+            echo "Нет изменений"
           fi
