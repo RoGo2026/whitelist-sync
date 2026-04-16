@@ -5,7 +5,6 @@ on:
     - cron: '*/40 * * * *'
   workflow_dispatch:
 
-# Защита от одновременных запусков (cron + AutoHotkey)
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
@@ -52,14 +51,12 @@ jobs:
             echo "Файл Base64.txt не найден, пропускаем Base64-декодирование."
           else
             while IFS= read -r base64_url || [ -n "$base64_url" ]; do
-              # Пропускаем пустые строки и комментарии
               [[ -z "$base64_url" || "$base64_url" =~ ^[[:space:]]*# ]] && continue
               base64_url=$(echo "$base64_url" | xargs)
               if [[ -n "$base64_url" ]]; then
-                # Генерируем временное имя файла для скачанного base64
                 b64_filename="b64_$(date +%s%N)_$RANDOM.tmp"
                 echo "Скачивание Base64: $base64_url"
-                curl -L -f --fail-early --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -o "./downloads/$b64_filename" "$base64_url"; then
+                if curl -L -f --fail-early --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -o "./downloads/$b64_filename" "$base64_url"; then
                   base64 --decode "./downloads/$b64_filename" 2>/dev/null | grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt
                   echo "Base64 успешно декодирован и добавлен: $base64_url"
                 else
@@ -108,22 +105,20 @@ jobs:
         run: |
           git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
 
-          # Копируем файл с рабочими ссылками
           if [ -f working_whitelist.txt ]; then
             cp -f working_whitelist.txt ./repo/mobile-whitelist-1.txt
           else
             cp -f mobile-whitelist-1.txt ./repo/mobile-whitelist-1.txt
           fi
 
-          # Принудительное обновление времени
           echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./repo/mobile-whitelist-1.txt
 
           cd ./repo
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
-          
+
           git add mobile-whitelist-1.txt
-          
+
           if git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
             git push
             echo "✅ Файл с проверенными ссылками успешно отправлен на GitVerse"
