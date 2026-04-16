@@ -28,7 +28,7 @@ jobs:
             exit 1
           fi
 
-          echo "Обработка обычных источников из sources.txt..."
+          echo "Обработка источников из sources.txt..."
 
           while IFS= read -r url || [ -n "$url" ]; do
             if [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]]; then
@@ -46,35 +46,32 @@ jobs:
             fi
           done < sources.txt
 
-          # 🔁 Декодирование Base64-ссылок из файла Base64.txt
-          echo "Обработка Base64-источников..."
-          BASE64_LIST="./Base64.txt"
-          
-          if [ -f "$BASE64_LIST" ]; then
-            while IFS= read -r b64_url || [ -n "$b64_url" ]; do
-              # Пропускаем пустые строки и комментарии
-              if [[ -z "$b64_url" || "$b64_url" =~ ^[[:space:]]*# ]]; then
-                continue
-              fi
-              b64_url=$(echo "$b64_url" | xargs)
-              if [[ -n "$b64_url" ]]; then
-                echo "Декодирование: $b64_url"
-                if curl -L -f --fail-early -s -o "./downloads/b64_raw.txt" "$b64_url"; then
-                  # Декодируем и фильтруем
-                  base64 --decode "./downloads/b64_raw.txt" 2>/dev/null | grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt
-                  echo "✓ Успешно декодировано: $b64_url"
-                else
-                  echo "⚠ Ошибка скачивания Base64: $b64_url" >&2
-                fi
-              fi
-            done < "$BASE64_LIST"
+          # Декодирование Base64 из списка URL в Base64.txt
+          echo "Обработка Base64 источников из Base64.txt..."
+          if [ ! -f Base64.txt ]; then
+            echo "Файл Base64.txt не найден, пропускаем Base64-декодирование."
           else
-            echo "⚠ Файл $BASE64_LIST не найден, пропускаем этап Base64"
+            while IFS= read -r base64_url || [ -n "$base64_url" ]; do
+              # Пропускаем пустые строки и комментарии
+              [[ -z "$base64_url" || "$base64_url" =~ ^[[:space:]]*# ]] && continue
+              base64_url=$(echo "$base64_url" | xargs)
+              if [[ -n "$base64_url" ]]; then
+                # Генерируем временное имя файла для скачанного base64
+                b64_filename="b64_$(date +%s%N)_$RANDOM.tmp"
+                echo "Скачивание Base64: $base64_url"
+                if curl -L -f --fail-early -o "./downloads/$b64_filename" "$base64_url"; then
+                  base64 --decode "./downloads/$b64_filename" 2>/dev/null | grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt
+                  echo "Base64 успешно декодирован и добавлен: $base64_url"
+                else
+                  echo "Ошибка скачивания Base64: $base64_url" >&2
+                fi
+                rm -f "./downloads/$b64_filename"
+              fi
+            done < Base64.txt
           fi
 
-          # Финальная очистка: удаляем пустые строки
+          # Финальная очистка
           sed -i '/^$/d' mobile-whitelist-1.txt
-          echo "✅ Сборка завершена. Строк в файле: $(wc -l < mobile-whitelist-1.txt)"
 
       - name: Сохранить собранный файл для проверки
         uses: actions/upload-artifact@v4
