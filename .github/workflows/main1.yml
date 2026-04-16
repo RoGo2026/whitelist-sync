@@ -59,7 +59,7 @@ jobs:
                 # Генерируем временное имя файла для скачанного base64
                 b64_filename="b64_$(date +%s%N)_$RANDOM.tmp"
                 echo "Скачивание Base64: $base64_url"
-                if curl -L -f --fail-early -o "./downloads/$b64_filename" "$base64_url"; then
+                curl -L -f --fail-early --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -o "./downloads/$b64_filename" "$base64_url"; then
                   base64 --decode "./downloads/$b64_filename" 2>/dev/null | grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt
                   echo "Base64 успешно декодирован и добавлен: $base64_url"
                 else
