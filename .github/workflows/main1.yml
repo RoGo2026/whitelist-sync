@@ -28,72 +28,101 @@ jobs:
           fi
 
           # =============================================================================
-          # ФУНКЦИЯ: Универсальная обработка ссылок (Base64 и прямые списки)
-          # Логика: Сначала пробуем как есть (для старых ссылок), если HTML — меняем UA.
+          # ФУНКЦИЯ: Универсальная обработка ссылок
           # =============================================================================
           process_link() {
             local url="$1"
             local output_file="$2"
             local temp_raw="./downloads/temp_raw_$$"
+            local cookie_jar="./downloads/cookies_$$"
             local decoded_tmp="./downloads/decoded_tmp_$$"
 
-            # --- ШАГ 1: Стандартное скачивание (чтобы не ломать mifa.world и др.) ---
-            curl -L -f --fail-early -s -o "$temp_raw" "$url"
+            # --- ШАГ 1: Стандартное скачивание ---
+            curl -L -f --fail-early -s -o "$temp_raw" "$url" 2>/dev/null
             local status=$?
 
-            local is_html=false
-            # Если скачалось с ошибкой ИЛИ внутри есть HTML теги
-            if [ $status -ne 0 ] || grep -qE '<!DOCTYPE|<html|<body|<div' "$temp_raw" 2>/dev/null; then
-              is_html=true
+            local need_retry=false
+            if [ $status -ne 0 ] || [ ! -s "$temp_raw" ]; then
+              need_retry=true
+            elif grep -qE '<!DOCTYPE|<html|<body' "$temp_raw" 2>/dev/null; then
+              need_retry=true
             fi
 
-            # --- ШАГ 2: Если HTML или ошибка — пробуем "Умные" заголовки ---
-            if [ "$is_html" = true ]; then
-              echo "   Стандартный запрос вернул ошибку или HTML. Пробуем v2ray заголовки..."
-              rm -f "$temp_raw" # Удаляем мусорный файл
+            # --- ШАГ 2: Если ошибка/HTML — пробуем с заголовками v2ray ---
+            if [ "$need_retry" = true ]; then
+              echo "   Стандартный запрос не удался. Пробуем v2ray заголовки..."
+              rm -f "$temp_raw"
 
-              # Попытка с заголовками v2rayN
               if ! curl -L -f --fail-early -s \
                  -H "User-Agent: v2rayN/6.42" \
                  -H "Accept: text/plain, */*" \
                  -H "Profile-Update: 1" \
-                 -o "$temp_raw" "$url"; then
+                 -o "$temp_raw" "$url" 2>/dev/null; then
                  
-                 # Попытка с заголовками Clash (запасной вариант)
+                 echo "   v2ray заголовки не помогли. Пробуем браузер + cookie..."
+                 rm -f "$temp_raw"
+                 
+                 # Сначала получаем cookie с главной страницы
+                 local domain=$(echo "$url" | sed -E 's|https?://([^/]+).*|\1|')
+                 local main_url="https://$domain"
+                 
+                 curl -s -L -c "$cookie_jar" "$main_url" >/dev/null 2>&1 || true
+                 
+                 # Теперь запрашиваем подписку с cookie и заголовками браузера
                  if ! curl -L -f --fail-early -s \
-                    -H "User-Agent: ClashMetaForAndroid/2.10.3" \
-                    -H "Accept: text/plain" \
-                    -o "$temp_raw" "$url"; then
-                    echo "❌ Не удалось скачать даже с v2ray заголовками: $url"
-                    rm -f "$temp_raw"
+                    -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+                    -H "Accept: text/plain,application/octet-stream,*/*" \
+                    -H "Accept-Language: en-US,en;q=0.9" \
+                    -H "Accept-Encoding: gzip, deflate, br" \
+                    -H "Connection: keep-alive" \
+                    -H "Sec-Fetch-Dest: empty" \
+                    -H "Sec-Fetch-Mode: cors" \
+                    -H "Sec-Fetch-Site: same-origin" \
+                    -b "$cookie_jar" \
+                    --compressed \
+                    -o "$temp_raw" "$url" 2>/dev/null; then
+                    echo "❌ Не удалось скачать с браузерными заголовками"
+                    rm -f "$temp_raw" "$cookie_jar"
                     return 1
                  fi
               fi
             fi
 
-            # Читаем содержимое, удаляем лишние пробелы и переносы
+            # Проверяем результат
+            if [ ! -s "$temp_raw" ]; then
+              echo "⚠ Пустой файл"
+              rm -f "$temp_raw" "$cookie_jar"
+              return 1
+            fi
+
+            # Проверяем, не HTML ли это
+            if grep -qE '<!DOCTYPE|<html|<body' "$temp_raw" 2>/dev/null; then
+              echo "⚠ Сервер вернул HTML вместо данных"
+              rm -f "$temp_raw" "$cookie_jar"
+              return 1
+            fi
+
+            # Читаем содержимое
             local content
             content=$(cat "$temp_raw" | tr -d '\r\n\t' | xargs)
             
             if [ -z "$content" ]; then
-              echo "⚠ Файл пустой: $url"
-              rm -f "$temp_raw"
+              echo "⚠ Пустой контент"
+              rm -f "$temp_raw" "$cookie_jar"
               return 1
             fi
 
-            # --- ШАГ 3: Декодирование или сохранение ---
-            
-            # Вариант А: Это Base64 (длинная строка из букв/цифр)
+            # --- ШАГ 3: Декодирование ---
             if [[ "$content" =~ ^[A-Za-z0-9+/=_-]{20,}$ ]]; then
-              # 1. Пробуем стандартный base64
+              # Стандартный Base64
               if echo "$content" | base64 -d > "$decoded_tmp" 2>/dev/null && [ -s "$decoded_tmp" ]; then
                 mv "$decoded_tmp" "$output_file"
                 echo "  ✅ Декодировано (Standard Base64)"
-                rm -f "$temp_raw"
+                rm -f "$temp_raw" "$cookie_jar"
                 return 0
               fi
               
-              # 2. Пробуем URL-Safe Base64 (замена символов - и _ на + и /)
+              # URL-Safe Base64
               local fixed_b64
               fixed_b64=$(echo "$content" | tr '_-' '/+' | tr -cd 'A-Za-z0-9+/=' | \
                 awk '{ len=length($0)%4; if(len==2)print $0"=="; else if(len==3)print $0"="; else print $0; }')
@@ -101,47 +130,43 @@ jobs:
               if echo "$fixed_b64" | base64 -d > "$decoded_tmp" 2>/dev/null && [ -s "$decoded_tmp" ]; then
                 mv "$decoded_tmp" "$output_file"
                 echo "  ✅ Декодировано (URL-Safe Base64)"
-                rm -f "$temp_raw"
+                rm -f "$temp_raw" "$cookie_jar"
                 return 0
               fi
             fi
 
-            # Вариант Б: Это готовый список ссылок (vmess://, vless://...)
+            # Готовый список ссылок
             if [[ "$content" =~ (vmess|vless|trojan|ss|ssr|hysteria|tuic):// ]]; then
               echo "$content" | tr ' ' '\n' | grep -v '^$' > "$output_file"
               echo "  ✅ Сохранено как список ссылок"
-              rm -f "$temp_raw"
+              rm -f "$temp_raw" "$cookie_jar"
               return 0
             fi
 
-            # Если ничего не подошло
-            echo "⚠ Не удалось распознать формат контента: $url"
-            rm -f "$temp_raw" "$decoded_tmp"
+            echo "⚠ Не распознан формат"
+            rm -f "$temp_raw" "$cookie_jar" "$decoded_tmp"
             return 1
           }
           # =============================================================================
 
-          echo "🔄 Обработка обычных источников из sources.txt..."
+          echo "🔄 Обработка sources.txt..."
           while IFS= read -r url || [ -n "$url" ]; do
-            if [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]]; then
-              continue
-            fi
+            [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]] && continue
             url=$(echo "$url" | xargs)
-            if [[ -n "$url" ]]; then
-              filename=$(basename "$url")
-              # Для sources.txt оставляем старую логику (просто скачиваем и добавляем)
-              if curl -L -f --fail-early -o "./downloads/$filename" "$url"; then
-                grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
-                echo "✅ Добавлено: $url"
-              else
-                echo "❌ Ошибка скачивания: $url" >&2
-              fi
+            [[ -z "$url" ]] && continue
+            
+            filename=$(basename "$url")
+            if curl -L -f --fail-early -o "./downloads/$filename" "$url" 2>/dev/null; then
+              grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
+              echo "✅ Добавлено: $url"
+            else
+              echo "❌ Ошибка: $url" >&2
             fi
           done < sources.txt
 
-          echo "🔄 Обработка источников из Base64.txt..."
+          echo "🔄 Обработка Base64.txt..."
           if [ ! -f Base64.txt ]; then
-            echo "ℹ️ Файл Base64.txt не найден, пропускаем."
+            echo "ℹ️ Base64.txt не найден"
           else
             while IFS= read -r base64_url || [ -n "$base64_url" ]; do
               [[ -z "$base64_url" || "$base64_url" =~ ^[[:space:]]*# ]] && continue
@@ -149,26 +174,22 @@ jobs:
               [[ -z "$base64_url" ]] && continue
               
               echo "📥 Обработка: $base64_url"
-              
               temp_decoded="./downloads/decoded_$$"
               
-              # Вызываем нашу универсальную функцию
               if process_link "$base64_url" "$temp_decoded"; then
                 grep -v '^[[:space:]]*#' "$temp_decoded" 2>/dev/null | sed '/^$/d' >> mobile-whitelist-1.txt
-                echo "✅ Успешно обработано: $base64_url"
+                echo "✅ Успешно: $base64_url"
               else
-                echo " Пропущено: $base64_url" >&2
+                echo "❌ Пропущено: $base64_url" >&2
               fi
               
               rm -f "$temp_decoded"
             done < Base64.txt
           fi
 
-          # Финальная очистка дубликатов и пустых строк
           sed -i '/^$/d' mobile-whitelist-1.txt
-          # (Опционально) Сортировка и удаление дублей: sort -u -o mobile-whitelist-1.txt mobile-whitelist-1.txt
 
-      - name: Сохранить собранный файл для проверки
+      - name: Сохранить собранный файл
         uses: actions/upload-artifact@v4
         with:
           name: raw-whitelist
@@ -196,10 +217,10 @@ jobs:
           sudo mv xray /usr/local/bin/
           echo "Xray-core установлен: $(xray version | head -n 1)"
 
-      - name: Запустить проверку ссылок через Xray-core
+      - name: Запустить проверку ссылок
         run: python3 check_links.py
 
-      - name: Обновить файл на GitVerse (только рабочие ссылки)
+      - name: Обновить файл на GitVerse
         run: |
           git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
 
@@ -219,7 +240,7 @@ jobs:
 
           if git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
             git push
-            echo "✅ Файл с проверенными ссылками успешно отправлен на GitVerse"
+            echo "✅ Файл отправлен на GitVerse"
           else
-            echo "ℹ️ Нет изменений после проверки"
+            echo "ℹ️ Нет изменений"
           fi
