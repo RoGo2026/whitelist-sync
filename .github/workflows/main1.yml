@@ -27,8 +27,101 @@ jobs:
             exit 1
           fi
 
-          echo "🔄 Обработка источников из sources.txt..."
+          # =============================================================================
+          # ФУНКЦИЯ: Универсальная обработка ссылок (Base64 и прямые списки)
+          # Логика: Сначала пробуем как есть (для старых ссылок), если HTML — меняем UA.
+          # =============================================================================
+          process_link() {
+            local url="$1"
+            local output_file="$2"
+            local temp_raw="./downloads/temp_raw_$$"
+            local decoded_tmp="./downloads/decoded_tmp_$$"
 
+            # --- ШАГ 1: Стандартное скачивание (чтобы не ломать mifa.world и др.) ---
+            curl -L -f --fail-early -s -o "$temp_raw" "$url"
+            local status=$?
+
+            local is_html=false
+            # Если скачалось с ошибкой ИЛИ внутри есть HTML теги
+            if [ $status -ne 0 ] || grep -qE '<!DOCTYPE|<html|<body|<div' "$temp_raw" 2>/dev/null; then
+              is_html=true
+            fi
+
+            # --- ШАГ 2: Если HTML или ошибка — пробуем "Умные" заголовки ---
+            if [ "$is_html" = true ]; then
+              echo "   Стандартный запрос вернул ошибку или HTML. Пробуем v2ray заголовки..."
+              rm -f "$temp_raw" # Удаляем мусорный файл
+
+              # Попытка с заголовками v2rayN
+              if ! curl -L -f --fail-early -s \
+                 -H "User-Agent: v2rayN/6.42" \
+                 -H "Accept: text/plain, */*" \
+                 -H "Profile-Update: 1" \
+                 -o "$temp_raw" "$url"; then
+                 
+                 # Попытка с заголовками Clash (запасной вариант)
+                 if ! curl -L -f --fail-early -s \
+                    -H "User-Agent: ClashMetaForAndroid/2.10.3" \
+                    -H "Accept: text/plain" \
+                    -o "$temp_raw" "$url"; then
+                    echo "❌ Не удалось скачать даже с v2ray заголовками: $url"
+                    rm -f "$temp_raw"
+                    return 1
+                 fi
+              fi
+            fi
+
+            # Читаем содержимое, удаляем лишние пробелы и переносы
+            local content
+            content=$(cat "$temp_raw" | tr -d '\r\n\t' | xargs)
+            
+            if [ -z "$content" ]; then
+              echo "⚠ Файл пустой: $url"
+              rm -f "$temp_raw"
+              return 1
+            fi
+
+            # --- ШАГ 3: Декодирование или сохранение ---
+            
+            # Вариант А: Это Base64 (длинная строка из букв/цифр)
+            if [[ "$content" =~ ^[A-Za-z0-9+/=_-]{20,}$ ]]; then
+              # 1. Пробуем стандартный base64
+              if echo "$content" | base64 -d > "$decoded_tmp" 2>/dev/null && [ -s "$decoded_tmp" ]; then
+                mv "$decoded_tmp" "$output_file"
+                echo "  ✅ Декодировано (Standard Base64)"
+                rm -f "$temp_raw"
+                return 0
+              fi
+              
+              # 2. Пробуем URL-Safe Base64 (замена символов - и _ на + и /)
+              local fixed_b64
+              fixed_b64=$(echo "$content" | tr '_-' '/+' | tr -cd 'A-Za-z0-9+/=' | \
+                awk '{ len=length($0)%4; if(len==2)print $0"=="; else if(len==3)print $0"="; else print $0; }')
+              
+              if echo "$fixed_b64" | base64 -d > "$decoded_tmp" 2>/dev/null && [ -s "$decoded_tmp" ]; then
+                mv "$decoded_tmp" "$output_file"
+                echo "  ✅ Декодировано (URL-Safe Base64)"
+                rm -f "$temp_raw"
+                return 0
+              fi
+            fi
+
+            # Вариант Б: Это готовый список ссылок (vmess://, vless://...)
+            if [[ "$content" =~ (vmess|vless|trojan|ss|ssr|hysteria|tuic):// ]]; then
+              echo "$content" | tr ' ' '\n' | grep -v '^$' > "$output_file"
+              echo "  ✅ Сохранено как список ссылок"
+              rm -f "$temp_raw"
+              return 0
+            fi
+
+            # Если ничего не подошло
+            echo "⚠ Не удалось распознать формат контента: $url"
+            rm -f "$temp_raw" "$decoded_tmp"
+            return 1
+          }
+          # =============================================================================
+
+          echo "🔄 Обработка обычных источников из sources.txt..."
           while IFS= read -r url || [ -n "$url" ]; do
             if [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]]; then
               continue
@@ -36,6 +129,7 @@ jobs:
             url=$(echo "$url" | xargs)
             if [[ -n "$url" ]]; then
               filename=$(basename "$url")
+              # Для sources.txt оставляем старую логику (просто скачиваем и добавляем)
               if curl -L -f --fail-early -o "./downloads/$filename" "$url"; then
                 grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
                 echo "✅ Добавлено: $url"
@@ -45,102 +139,6 @@ jobs:
             fi
           done < sources.txt
 
-          # ==============================================================================
-          # ФУНКЦИЯ: Умное декодирование подписок (обратная совместимость + новые сервисы)
-          # ==============================================================================
-          decode_subscription_universal() {
-            local url="$1"
-            local output_file="$2"
-            local temp_raw="./downloads/raw_$$"
-            
-            # ШАГ 1: Пробуем скачать с обычными заголовками (для старых ссылок)
-            if ! curl -L -f --fail-early -s -o "$temp_raw" "$url" 2>/dev/null; then
-              echo "❌ Не удалось скачать: $url" >&2
-              rm -f "$temp_raw"
-              return 1
-            fi
-            
-            # ШАГ 2: Проверяем, не вернули ли нам HTML
-            if grep -qE '<!DOCTYPE|<html|<head|<body|<div' "$temp_raw" 2>/dev/null; then
-              echo "  → Обнаружен HTML, пробуем заголовки v2ray-приложения..."
-              
-              if ! curl -L -f --fail-early -s \
-                 -H "User-Agent: v2rayN/6.42" \
-                 -H "Accept: text/plain, */*" \
-                 -H "Profile-Update: 1" \
-                 -o "$temp_raw" "$url" 2>/dev/null; then
-                 curl -L -f --fail-early -s \
-                   -H "User-Agent: ClashMetaForAndroid/2.10.3" \
-                   -H "Accept: text/plain" \
-                   -o "$temp_raw" "$url" 2>/dev/null || true
-              fi
-            fi
-            
-            # ШАГ 3: Извлекаем и чистим контент
-            local content
-            content=$(cat "$temp_raw" | tr -d '\r\n\t' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | xargs)
-            
-            if [[ -z "$content" ]]; then
-              echo "⚠ Пустой ответ от: $url" >&2
-              rm -f "$temp_raw"
-              return 1
-            fi
-            
-            # ШАГ 4: Определяем тип и декодируем
-            
-            # Вариант А: Чистый Base64 (старые ссылки) — пробуем стандартное декодирование
-            if [[ "$content" =~ ^[A-Za-z0-9+/=_-]{20,}$ ]] && ! [[ "$content" =~ vmess://|vless://|trojan://|ss://|hysteria:// ]]; then
-              if echo "$content" | base64 -d > "$output_file" 2>/dev/null && [[ -s "$output_file" ]]; then
-                echo "  → Декодировано стандартным base64"
-                rm -f "$temp_raw"
-                return 0
-              fi
-              
-              # Универсальный метод (URL-safe + паддинг)
-              local decoded
-              decoded=$(echo "$content" | tr '_-' '/+' | tr -cd 'A-Za-z0-9+/=' | \
-                awk '{ len=length($0)%4; if(len==2)print $0"=="; else if(len==3)print $0"="; else print $0; }' | \
-                base64 -d 2>/dev/null)
-              
-              if [[ -n "$decoded" ]]; then
-                echo "$decoded" > "$output_file"
-                echo "  → Декодировано универсальным методом (URL-safe Base64)"
-                rm -f "$temp_raw"
-                return 0
-              fi
-            fi
-            
-            # Вариант Б: Уже готовый список ссылок — сохраняем как есть
-            if [[ "$content" =~ ^(vmess|vless|trojan|ss|ssr|hysteria|tuic|juicity):// ]]; then
-              echo "$content" | tr ' ' '\n' | grep -v '^$' > "$output_file"
-              echo "  → Сохранено как готовый список протоколов"
-              rm -f "$temp_raw"
-              return 0
-            fi
-            
-            # Вариант В: Извлекаем Base64 из смешанного контента
-            local cleaned
-            cleaned=$(echo "$content" | grep -oE '[A-Za-z0-9+/=_-]{50,}' | head -1)
-            if [[ -n "$cleaned" ]]; then
-              local decoded
-              decoded=$(echo "$cleaned" | tr '_-' '/+' | tr -cd 'A-Za-z0-9+/=' | \
-                awk '{ len=length($0)%4; if(len==2)print $0"=="; else if(len==3)print $0"="; else print $0; }' | \
-                base64 -d 2>/dev/null)
-              
-              if [[ -n "$decoded" && "$decoded" =~ (vmess|vless|trojan|ss|ssr|hysteria):// ]]; then
-                echo "$decoded" | tr ' ' '\n' | grep -v '^$' > "$output_file"
-                echo "  → Извлечено и декодировано из смешанного контента"
-                rm -f "$temp_raw"
-                return 0
-              fi
-            fi
-            
-            echo "⚠ Не удалось распознать формат подписки: $url" >&2
-            rm -f "$temp_raw"
-            return 1
-          }
-
-          # Обработка источников из Base64.txt
           echo "🔄 Обработка источников из Base64.txt..."
           if [ ! -f Base64.txt ]; then
             echo "ℹ️ Файл Base64.txt не найден, пропускаем."
@@ -154,19 +152,21 @@ jobs:
               
               temp_decoded="./downloads/decoded_$$"
               
-              if decode_subscription_universal "$base64_url" "$temp_decoded"; then
+              # Вызываем нашу универсальную функцию
+              if process_link "$base64_url" "$temp_decoded"; then
                 grep -v '^[[:space:]]*#' "$temp_decoded" 2>/dev/null | sed '/^$/d' >> mobile-whitelist-1.txt
-                echo "✅ Успешно: $base64_url"
+                echo "✅ Успешно обработано: $base64_url"
               else
-                echo "❌ Пропущено: $base64_url" >&2
+                echo " Пропущено: $base64_url" >&2
               fi
               
               rm -f "$temp_decoded"
             done < Base64.txt
           fi
 
-          # Финальная очистка
+          # Финальная очистка дубликатов и пустых строк
           sed -i '/^$/d' mobile-whitelist-1.txt
+          # (Опционально) Сортировка и удаление дублей: sort -u -o mobile-whitelist-1.txt mobile-whitelist-1.txt
 
       - name: Сохранить собранный файл для проверки
         uses: actions/upload-artifact@v4
