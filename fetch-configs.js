@@ -2,15 +2,15 @@ const { chromium } = require('playwright');
 const fs = require('fs');
 
 (async () => {
-  console.log('Запуск браузера и открытие двух сайтов параллельно...');
+  console.log('Запуск браузера');
   
   const browser = await chromium.launch({ 
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
 
-  const page1 = await browser.newPage();  // Сайт 1 — UWB
-  const page2 = await browser.newPage();  // Сайт 2 — OBConfigs
+  const page1 = await browser.newPage();
+  const page2 = await browser.newPage();
 
   await page1.setViewportSize({ width: 1280, height: 800 });
   await page2.setViewportSize({ width: 1280, height: 800 });
