@@ -23,168 +23,54 @@ jobs:
           > mobile-whitelist-1.txt
 
           if [ ! -f sources.txt ]; then
-            echo "Ошибка: файл sources.txt не найден!" >&2
+            echo "Ошибка: файл sources.txt не найден в корне репозитория!" >&2
             exit 1
           fi
 
-          # =============================================================================
-          # ФУНКЦИЯ: Обработка с отладкой и обходными путями
-          # =============================================================================
-          process_link() {
-            local url="$1"
-            local output_file="$2"
-            local temp_raw="./downloads/temp_raw_$$"
-            local decoded_tmp="./downloads/decoded_tmp_$$"
-            local debug_log="./downloads/debug_$$"
+          echo "Обработка источников из sources.txt..."
 
-            echo "   🔍 URL: $url" > "$debug_log"
-
-            # --- Попытка 1: Стандартный curl с подробным логом ---
-            echo "   [1/4] Стандартный запрос..."
-            curl -L -s -w "\nHTTP_CODE:%{http_code}\nSIZE:%{size_download}\nTIME:%{time_total}\n" \
-                 -A "curl/7.88.0" \
-                 -o "$temp_raw" "$url" 2>&1 | tee -a "$debug_log"
-            
-            if [ -s "$temp_raw" ] && ! grep -qE '<!DOCTYPE|<html|<body' "$temp_raw" 2>/dev/null; then
-              echo "   ✅ Успех на шаге 1"
-            else
-              echo "   ⚠ Шаг 1 не дал результат" >> "$debug_log"
-              
-              # --- Попытка 2: v2ray заголовки ---
-              echo "   [2/4] Заголовки v2rayN..." >> "$debug_log"
-              rm -f "$temp_raw"
-              curl -L -s -w "\nHTTP_CODE:%{http_code}\n" \
-                   -H "User-Agent: v2rayN/6.42" \
-                   -H "Accept: text/plain, */*" \
-                   -H "Profile-Update: 1" \
-                   --connect-timeout 15 \
-                   --max-time 30 \
-                   -o "$temp_raw" "$url" 2>&1 | tee -a "$debug_log"
-            fi
-
-            # --- Попытка 3: Браузерные заголовки + retry ---
-            if [ ! -s "$temp_raw" ] || grep -qE '<!DOCTYPE|<html' "$temp_raw" 2>/dev/null; then
-              echo "   [3/4] Браузерные заголовки + retry..." >> "$debug_log"
-              rm -f "$temp_raw"
-              curl -L -s -w "\nHTTP_CODE:%{http_code}\n" \
-                   -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36" \
-                   -H "Accept: text/plain,*/*;q=0.9" \
-                   -H "Accept-Language: en-US,en;q=0.9" \
-                   --connect-timeout 15 \
-                   --max-time 30 \
-                   --retry 2 \
-                   --retry-delay 3 \
-                   -o "$temp_raw" "$url" 2>&1 | tee -a "$debug_log"
-            fi
-
-            # --- Попытка 4: Инкогнито-режим (минимум заголовков) ---
-            if [ ! -s "$temp_raw" ] || grep -qE '<!DOCTYPE|<html' "$temp_raw" 2>/dev/null; then
-              echo "   [4/4] Минималистичный запрос..." >> "$debug_log"
-              rm -f "$temp_raw"
-              curl -L -s -w "\nHTTP_CODE:%{http_code}\n" \
-                   -H "User-Agent:" \
-                   --connect-timeout 20 \
-                   -o "$temp_raw" "$url" 2>&1 | tee -a "$debug_log"
-            fi
-
-            # === АНАЛИЗ РЕЗУЛЬТАТА ===
-            echo "" >> "$debug_log"
-            echo "=== РАЗМЕР ФАЙЛА: $(stat -c%s "$temp_raw" 2>/dev/null || echo 0) байт ===" >> "$debug_log"
-            
-            if [ ! -s "$temp_raw" ]; then
-              echo "❌ Файл пустой или не создан"
-              echo ">>> ЛОГ ОТЛАДКИ:" >&2
-              cat "$debug_log" >&2
-              rm -f "$temp_raw" "$debug_log"
-              return 1
-            fi
-
-            if grep -qE '<!DOCTYPE|<html|<title>|Access Denied|Cloudflare|Checking your browser' "$temp_raw" 2>/dev/null; then
-              echo "❌ Сервер вернул страницу блокировки/капчи"
-              echo ">>> СОДЕРЖИМОЕ (первые 400 символов):" >&2
-              head -c 400 "$temp_raw" | cat -v >&2
-              echo "" >&2
-              rm -f "$temp_raw" "$debug_log"
-              return 1
-            fi
-
-            # Читаем контент
-            local content
-            content=$(cat "$temp_raw" | tr -d '\r\n\t' | xargs)
-            [ -z "$content" ] && { echo "❌ Пустой контент"; rm -f "$temp_raw" "$debug_log"; return 1; }
-
-            # === ДЕКОДИРОВАНИЕ ===
-            # 1. Стандартный Base64
-            if [[ "$content" =~ ^[A-Za-z0-9+/=]{30,}$ ]]; then
-              if echo "$content" | base64 -d > "$decoded_tmp" 2>/dev/null && [ -s "$decoded_tmp" ]; then
-                if grep -qE '^(vmess|vless|trojan|ss|ssr)://' "$decoded_tmp" 2>/dev/null; then
-                  mv "$decoded_tmp" "$output_file"
-                  echo "  ✅ Декодировано (Standard)"
-                  rm -f "$temp_raw" "$debug_log"
-                  return 0
-                fi
-              fi
-            fi
-            # 2. URL-Safe Base64
-            if [[ "$content" =~ ^[A-Za-z0-9_=-]{30,}$ ]]; then
-              local fixed=$(echo "$content" | tr '_-' '/+' | tr -cd 'A-Za-z0-9+/=' | \
-                awk '{len=length($0)%4;if(len==2)print $0"==";else if(len==3)print $0"=";else print $0;}')
-              if echo "$fixed" | base64 -d > "$decoded_tmp" 2>/dev/null && [ -s "$decoded_tmp" ]; then
-                if grep -qE '^(vmess|vless|trojan|ss|ssr)://' "$decoded_tmp" 2>/dev/null; then
-                  mv "$decoded_tmp" "$output_file"
-                  echo "  ✅ Декодировано (URL-Safe)"
-                  rm -f "$temp_raw" "$debug_log"
-                  return 0
-                fi
-              fi
-            fi
-            # 3. Готовый список
-            if [[ "$content" =~ (vmess|vless|trojan|ss|ssr|hysteria):// ]]; then
-              echo "$content" | tr ' ' '\n' | grep -v '^$' > "$output_file"
-              echo "  ✅ Сохранено как список"
-              rm -f "$temp_raw" "$debug_log"
-              return 0
-            fi
-
-            echo "❌ Не удалось декодировать"
-            rm -f "$temp_raw" "$decoded_tmp" "$debug_log"
-            return 1
-          }
-          # =============================================================================
-
-          echo "🔄 sources.txt..."
           while IFS= read -r url || [ -n "$url" ]; do
-            [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]] && continue
-            url=$(echo "$url" | xargs); [[ -z "$url" ]] && continue
-            filename=$(basename "$url")
-            if curl -L -f --fail-early -o "./downloads/$filename" "$url" 2>/dev/null; then
-              grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
-              echo "✅ $url"
-            else
-              echo "❌ $url" >&2
+            if [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]]; then
+              continue
+            fi
+            url=$(echo "$url" | xargs)
+            if [[ -n "$url" ]]; then
+              filename=$(basename "$url")
+              if curl -L -f --fail-early -o "./downloads/$filename" "$url"; then
+                grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
+                echo "Добавлено: $url"
+              else
+                echo "Ошибка скачивания: $url" >&2
+              fi
             fi
           done < sources.txt
 
-          echo "🔄 Base64.txt..."
-          if [ -f Base64.txt ]; then
+          # Декодирование Base64 из списка URL в Base64.txt
+          echo "Обработка Base64 источников из Base64.txt..."
+          if [ ! -f Base64.txt ]; then
+            echo "Файл Base64.txt не найден, пропускаем Base64-декодирование."
+          else
             while IFS= read -r base64_url || [ -n "$base64_url" ]; do
               [[ -z "$base64_url" || "$base64_url" =~ ^[[:space:]]*# ]] && continue
-              base64_url=$(echo "$base64_url" | xargs); [[ -z "$base64_url" ]] && continue
-              echo "📥 $base64_url"
-              temp_decoded="./downloads/dec_$$"
-              if process_link "$base64_url" "$temp_decoded"; then
-                grep -v '^[[:space:]]*#' "$temp_decoded" 2>/dev/null | sed '/^$/d' >> mobile-whitelist-1.txt
-                echo "✅ Успешно"
-              else
-                echo "❌ Пропущено" >&2
+              base64_url=$(echo "$base64_url" | xargs)
+              if [[ -n "$base64_url" ]]; then
+                b64_filename="b64_$(date +%s%N)_$RANDOM.tmp"
+                echo "Скачивание Base64: $base64_url"
+                if curl -L -f --fail-early --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -o "./downloads/$b64_filename" "$base64_url"; then
+                  base64 --decode "./downloads/$b64_filename" 2>/dev/null | grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt
+                  echo "Base64 успешно декодирован и добавлен: $base64_url"
+                else
+                  echo "Ошибка скачивания Base64: $base64_url" >&2
+                fi
+                rm -f "./downloads/$b64_filename"
               fi
-              rm -f "$temp_decoded"
             done < Base64.txt
           fi
 
+          # Финальная очистка
           sed -i '/^$/d' mobile-whitelist-1.txt
 
-      - name: Сохранить артефакт
+      - name: Сохранить собранный файл для проверки
         uses: actions/upload-artifact@v4
         with:
           name: raw-whitelist
@@ -194,22 +80,48 @@ jobs:
     needs: collect-sources
     runs-on: ubuntu-latest
     timeout-minutes: 25
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with: { name: raw-whitelist }
-      - name: Установить Xray
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Скачать собранный файл
+        uses: actions/download-artifact@v4
+        with:
+          name: raw-whitelist
+
+      - name: Скачать и установить Xray-core
         run: |
           wget -q https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip -O xray.zip
-          unzip -q xray.zip && chmod +x xray && sudo mv xray /usr/local/bin/
-      - name: Проверка ссылок
+          unzip -q xray.zip
+          chmod +x xray
+          sudo mv xray /usr/local/bin/
+          echo "Xray-core установлен: $(xray version | head -n 1)"
+
+      - name: Запустить проверку ссылок через Xray-core
         run: python3 check_links.py
-      - name: Push на GitVerse
+
+      - name: Обновить файл на GitVerse (только рабочие ссылки)
         run: |
           git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
-          [ -f working_whitelist.txt ] && cp -f working_whitelist.txt ./repo/mobile-whitelist-1.txt || cp -f mobile-whitelist-1.txt ./repo/mobile-whitelist-1.txt
-          echo "# Updated: $(date -u)" >> ./repo/mobile-whitelist-1.txt
+
+          if [ -f working_whitelist.txt ]; then
+            cp -f working_whitelist.txt ./repo/mobile-whitelist-1.txt
+          else
+            cp -f mobile-whitelist-1.txt ./repo/mobile-whitelist-1.txt
+          fi
+
+          echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./repo/mobile-whitelist-1.txt
+
           cd ./repo
-          git config user.name "Bot" && git config user.email "bot@local"
+          git config user.name "GitHub Action Bot"
+          git config user.email "action@noreply.github.com"
+
           git add mobile-whitelist-1.txt
-          git commit -m "update $(date -u)" && git push && echo "✅ Pushed" || echo "ℹ️ No changes"
+
+          if git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
+            git push
+            echo "✅ Файл с проверенными ссылками успешно отправлен на GitVerse"
+          else
+            echo "Нет изменений после проверки"
+          fi
