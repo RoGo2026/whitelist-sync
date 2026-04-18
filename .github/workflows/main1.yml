@@ -14,133 +14,114 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout GitHub repository
         uses: actions/checkout@v4
 
-      - name: Download and build whitelist
+      - name: Скачать источники и создать чистый mobile-whitelist-1.txt
         run: |
           mkdir -p ./downloads
           > mobile-whitelist-1.txt
 
           if [ ! -f sources.txt ]; then
-            echo "sources.txt not found" >&2
+            echo "Ошибка: файл sources.txt не найден в корне репозитория!" >&2
             exit 1
           fi
 
+          echo "Обработка источников из sources.txt..."
+
           while IFS= read -r url || [ -n "$url" ]; do
-            [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]] && continue
-            url=$(echo "$url" | xargs)
-
-            filename=$(basename "$url")
-            file="./downloads/$filename"
-
-            success=0
-
-            for ua in "Clash" "sing-box" "Mozilla/5.0"; do
-              if curl -L -f --fail-early -H "User-Agent: $ua" -o "$file" "$url"; then
-                success=1
-                break
-              fi
-            done
-
-            if [ $success -eq 0 ]; then
-              echo "Download failed: $url" >&2
+            if [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]]; then
               continue
             fi
-
-            raw=$(cat "$file" | tr -d '\r\n ')
-
-            decoded=$(echo "$raw" | base64 -d 2>/dev/null || true)
-
-            if [ -n "$decoded" ]; then
-              echo "$decoded" | grep -E '^(vless|vmess|trojan)://' >> mobile-whitelist-1.txt || true
-            else
-              echo "$raw" | grep -E '^(vless|vmess|trojan)://' >> mobile-whitelist-1.txt || true
+            url=$(echo "$url" | xargs)
+            if [[ -n "$url" ]]; then
+              filename=$(basename "$url")
+              if curl -L -f --fail-early -o "./downloads/$filename" "$url"; then
+                grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
+                echo "Добавлено: $url"
+              else
+                echo "Ошибка скачивания: $url" >&2
+              fi
             fi
-
           done < sources.txt
 
-      - name: Base64 sources
-        run: |
+          # Декодирование Base64 из списка URL в Base64.txt
+          echo "Обработка Base64 источников из Base64.txt..."
           if [ ! -f Base64.txt ]; then
-            echo "No Base64.txt, skipping"
-            exit 0
+            echo "Файл Base64.txt не найден, пропускаем Base64-декодирование."
+          else
+            while IFS= read -r base64_url || [ -n "$base64_url" ]; do
+              [[ -z "$base64_url" || "$base64_url" =~ ^[[:space:]]*# ]] && continue
+              base64_url=$(echo "$base64_url" | xargs)
+              if [[ -n "$base64_url" ]]; then
+                b64_filename="b64_$(date +%s%N)_$RANDOM.tmp"
+                echo "Скачивание Base64: $base64_url"
+                if curl -L -f --fail-early --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -o "./downloads/$b64_filename" "$base64_url"; then
+                  base64 --decode "./downloads/$b64_filename" 2>/dev/null | grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt
+                  echo "Base64 успешно декодирован и добавлен: $base64_url"
+                else
+                  echo "Ошибка скачивания Base64: $base64_url" >&2
+                fi
+                rm -f "./downloads/$b64_filename"
+              fi
+            done < Base64.txt
           fi
 
-          while IFS= read -r url || [ -n "$url" ]; do
-            [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]] && continue
-            url=$(echo "$url" | xargs)
-
-            file="./downloads/b64_$(date +%s%N)_$RANDOM.tmp"
-
-            success=0
-
-            for ua in "Clash" "sing-box" "Mozilla/5.0"; do
-              if curl -L -f --fail-early -H "User-Agent: $ua" -o "$file" "$url"; then
-                success=1
-                break
-              fi
-            done
-
-            if [ $success -eq 0 ]; then
-              echo "Base64 download failed: $url" >&2
-              continue
-            fi
-
-            raw=$(cat "$file" | tr -d '\r\n ')
-
-            decoded=$(echo "$raw" | base64 -d 2>/dev/null || true)
-
-            if [ -n "$decoded" ]; then
-              echo "$decoded" | grep -E '^(vless|vmess|trojan)://' >> mobile-whitelist-1.txt || true
-            else
-              echo "$raw" | grep -E '^(vless|vmess|trojan)://' >> mobile-whitelist-1.txt || true
-            fi
-
-            rm -f "$file"
-
-          done < Base64.txt
-
-      - name: Clean file
-        run: |
+          # Финальная очистка
           sed -i '/^$/d' mobile-whitelist-1.txt
 
-      - name: Upload artifact
+      - name: Сохранить собранный файл для проверки
         uses: actions/upload-artifact@v4
         with:
-          name: whitelist
+          name: raw-whitelist
           path: mobile-whitelist-1.txt
 
-  push-to-gitverse:
+  test-and-filter:
     needs: collect-sources
     runs-on: ubuntu-latest
+    timeout-minutes: 25
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download artifact
+      - name: Скачать собранный файл
         uses: actions/download-artifact@v4
         with:
-          name: whitelist
+          name: raw-whitelist
 
-      - name: Build working list
+      - name: Скачать и установить Xray-core
         run: |
-          grep -E '^(vless|vmess|trojan)://' mobile-whitelist-1.txt > working_whitelist.txt || true
+          wget -q https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip -O xray.zip
+          unzip -q xray.zip
+          chmod +x xray
+          sudo mv xray /usr/local/bin/
+          echo "Xray-core установлен: $(xray version | head -n 1)"
 
-      - name: Push to GitVerse
+      - name: Запустить проверку ссылок через Xray-core
+        run: python3 check_links.py
+
+      - name: Обновить файл на GitVerse (только рабочие ссылки)
         run: |
-          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git repo
+          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
 
-          cp working_whitelist.txt repo/mobile-whitelist-1.txt || cp mobile-whitelist-1.txt repo/mobile-whitelist-1.txt
+          if [ -f working_whitelist.txt ]; then
+            cp -f working_whitelist.txt ./repo/mobile-whitelist-1.txt
+          else
+            cp -f mobile-whitelist-1.txt ./repo/mobile-whitelist-1.txt
+          fi
 
-          echo "# Updated: $(date -u)" >> repo/mobile-whitelist-1.txt
+          echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./repo/mobile-whitelist-1.txt
 
-          cd repo
+          cd ./repo
           git config user.name "GitHub Action Bot"
-          git config user.email "bot@noreply.com"
+          git config user.email "action@noreply.github.com"
 
           git add mobile-whitelist-1.txt
 
-          git commit -m "auto update $(date -u)" || exit 0
-          git push || exit 0
+          if git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
+            git push
+            echo "✅ Файл с проверенными ссылками успешно отправлен на GitVerse"
+          else
+            echo "Нет изменений после проверки"
+          fi
