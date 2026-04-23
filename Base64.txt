@@ -4,7 +4,7 @@ https://mifa.world/ss
 https://mifa.world/trojan
 https://mifa.world/hysteria
 https://api.scamhost.online/sub/user/57792d14-e1e5-4d60-850a-4bb06fea93f9
-# https://gitflic.ru/project/sigil/my-new-cool-project/blob/raw?file=whitelist&branch=master
+https://gitflic.ru/project/sigil/my-new-cool-project/blob/raw?file=whitelist&branch=master
 # https://raw.githubusercontent.com/ssrsub/ssr/refs/heads/master/v2ray
 # https://raw.githubusercontent.com/acymz/AutoVPN/refs/heads/main/data/V2.txt
 
