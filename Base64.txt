@@ -1,6 +1,8 @@
 https://gitflic.ru/project/sigil/my-new-cool-project/blob/raw?file=whitelist&branch=master
 https://mifa.world/vless
 https://mifa.world/ss
+https://mifa.world/trojan
+https://mifa.world/hysteria
 https://gist.githubusercontent.com/RoGo2026/d2ec2bb7954b394d405bf09c654fe44e/raw/7150775050db9ed54614bb7f123c3f7cb310c5c4/gistfile1.txt
 # https://raw.githubusercontent.com/ssrsub/ssr/refs/heads/master/v2ray
 # https://raw.githubusercontent.com/acymz/AutoVPN/refs/heads/main/data/V2.txt
