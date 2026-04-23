@@ -1,8 +1,8 @@
-https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist
 https://raw.githubusercontent.com/expressalaki/ExpressVPN/main/configs.txt
 https://raw.githubusercontent.com/expressalaki/ExpressVPN/main/configs4.txt
 https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt
 https://raw.githubusercontent.com/ShadowException/VPN/refs/heads/main/configs/VPN-cat-top-100
+# https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist
 # https://raw.githubusercontent.com/ewecrow78-gif/whitelist1/refs/heads/main/list.txt
 # https://raw.githubusercontent.com/ShadowException/VPN/refs/heads/main/configs/VPN-cat
 # https://raw.githubusercontent.com/SoliSpirit/SolVPN/refs/heads/main/all_configs.txt
