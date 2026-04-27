@@ -1,5 +1,5 @@
 https://gitflic.ru/project/sigil/my-new-cool-project/blob/raw?file=whitelist&branch=master
-https://gist.githubusercontent.com/RoGo2026/d2ec2bb7954b394d405bf09c654fe44e/raw/7150775050db9ed54614bb7f123c3f7cb310c5c4/gistfile1.txt
+https://gist.githubusercontent.com/RoGo2026/d2ec2bb7954b394d405bf09c654fe44e/raw/acc685d41121e112d5cd3d5afb09c7a9184448fc/gistfile1.txt
 https://mifa.world/vless
 https://mifa.world/ss
 https://mifa.world/trojan
