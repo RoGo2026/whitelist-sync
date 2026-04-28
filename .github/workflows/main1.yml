@@ -17,39 +17,40 @@ jobs:
       - name: Checkout GitHub repository
         uses: actions/checkout@v4
 
-      - name: Скачать источники и создать чистый mobile-whitelist-1.txt
+      - name: Скачать источники и собрать mobile-whitelist-1.txt
         run: |
           mkdir -p ./downloads
           > mobile-whitelist-1.txt
 
-          if [ ! -f sources.txt ]; then
-            echo "Ошибка: файл sources.txt не найден!" >&2
-            exit 1
-          fi
-
           echo "Обработка обычных источников..."
 
-          while IFS= read -r url || [ -n "$url" ]; do
-            [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]] && continue
-            url=$(echo "$url" | xargs)
+          if [ -f sources.txt ]; then
+            while IFS= read -r url || [ -n "$url" ]; do
+              [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]] && continue
+              url=$(echo "$url" | xargs)
 
-            filename="src_$(date +%s%N)_$RANDOM.tmp"
+              tmp="./downloads/src_$(date +%s%N)_$RANDOM.tmp"
 
-            if curl -L -f --fail-early \
-              --connect-timeout 10 --max-time 20 \
-              --user-agent "Mozilla/5.0" \
-              -o "./downloads/$filename" "$url"; then
+              if curl -L --fail --compressed --http1.1 \
+                --connect-timeout 10 --max-time 25 \
+                --retry 2 \
+                --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+                -H "Accept: */*" \
+                -H "Accept-Language: en-US,en;q=0.9" \
+                -H "Connection: keep-alive" \
+                -H "Referer: https://www.google.com/" \
+                -o "$tmp" "$url"; then
 
-              grep -v '^[[:space:]]*#' "./downloads/$filename" \
-                | sed '/^$/d' >> mobile-whitelist-1.txt
+                grep -v '^[[:space:]]*#' "$tmp" | sed '/^$/d' >> mobile-whitelist-1.txt
+                echo "Добавлено: $url"
 
-              echo "Добавлено: $url"
-            else
-              echo "Ошибка скачивания: $url" >&2
-            fi
+              else
+                echo "Ошибка скачивания: $url"
+              fi
 
-            rm -f "./downloads/$filename"
-          done < sources.txt
+              rm -f "$tmp"
+            done < sources.txt
+          fi
 
 
           echo "Обработка Base64 источников..."
@@ -61,46 +62,48 @@ jobs:
 
               b64_file="./downloads/b64_$(date +%s%N)_$RANDOM.tmp"
 
-              echo "Скачивание Base64: $base64_url"
+              echo "Скачивание: $base64_url"
 
-              if curl -L -f --fail-early \
-                --connect-timeout 10 --max-time 20 \
-                --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+              if curl -L --fail --compressed --http1.1 \
+                --connect-timeout 10 --max-time 25 \
+                --retry 2 \
+                --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36" \
+                -H "Accept: */*" \
+                -H "Accept-Language: en-US,en;q=0.9" \
+                -H "Connection: keep-alive" \
+                -H "Referer: https://www.google.com/" \
+                -H "Accept-Encoding: gzip, deflate, br" \
                 -o "$b64_file" "$base64_url"; then
 
-                # Проверка что это похоже на base64 VLESS
+                # Проверка на Base64 (vless внутри)
                 if grep -q "dmxlc3M" "$b64_file"; then
 
-                  # Убираем переносы → декодируем → чистим
                   cat "$b64_file" \
                     | tr -d '\r\n' \
                     | base64 -d 2>/dev/null \
                     | grep -v '^[[:space:]]*#' \
                     | sed '/^$/d' >> mobile-whitelist-1.txt
 
-                  echo "Base64 успешно декодирован: $base64_url"
+                  echo "OK: декодировано"
 
                 else
-                  echo "⚠ Не похоже на Base64/VLESS: $base64_url"
+                  echo "⚠ Не Base64 или защита (возможно 403 HTML)"
                 fi
 
               else
-                echo "Ошибка скачивания Base64: $base64_url" >&2
+                echo "❌ 403 / ошибка доступа"
               fi
 
               rm -f "$b64_file"
-
             done < Base64.txt
-          else
-            echo "Base64.txt не найден — пропуск"
           fi
 
 
-          # Финальная очистка + удаление дублей
+          # Очистка + удаление дублей
           sed -i '/^$/d' mobile-whitelist-1.txt
           sort -u mobile-whitelist-1.txt -o mobile-whitelist-1.txt
 
-      - name: Сохранить собранный файл
+      - name: Сохранить файл
         uses: actions/upload-artifact@v4
         with:
           name: raw-whitelist
@@ -113,11 +116,9 @@ jobs:
     timeout-minutes: 25
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Скачать собранный файл
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: raw-whitelist
 
@@ -127,7 +128,7 @@ jobs:
           unzip -q xray.zip
           chmod +x xray
           sudo mv xray /usr/local/bin/
-          echo "Xray: $(xray version | head -n 1)"
+          xray version
 
       - name: Проверка ссылок
         run: python3 check_links.py
@@ -137,9 +138,9 @@ jobs:
           git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git repo
 
           if [ -f working_whitelist.txt ]; then
-            cp -f working_whitelist.txt repo/mobile-whitelist-1.txt
+            cp working_whitelist.txt repo/mobile-whitelist-1.txt
           else
-            cp -f mobile-whitelist-1.txt repo/mobile-whitelist-1.txt
+            cp mobile-whitelist-1.txt repo/mobile-whitelist-1.txt
           fi
 
           echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> repo/mobile-whitelist-1.txt
