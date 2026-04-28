@@ -23,58 +23,89 @@ jobs:
           > mobile-whitelist-1.txt
 
           if [ ! -f sources.txt ]; then
-            echo "Ошибка: файл sources.txt не найден в корне репозитория!" >&2
+            echo "Ошибка: файл sources.txt не найден!" >&2
             exit 1
           fi
 
-          echo "Обработка источников из sources.txt..."
+          echo "Обработка обычных источников..."
 
           while IFS= read -r url || [ -n "$url" ]; do
-            if [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]]; then
-              continue
-            fi
+            [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]] && continue
             url=$(echo "$url" | xargs)
-            if [[ -n "$url" ]]; then
-              filename=$(basename "$url")
-              if curl -L -f --fail-early -o "./downloads/$filename" "$url"; then
-                grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
-                echo "Добавлено: $url"
-              else
-                echo "Ошибка скачивания: $url" >&2
-              fi
+
+            filename="src_$(date +%s%N)_$RANDOM.tmp"
+
+            if curl -L -f --fail-early \
+              --connect-timeout 10 --max-time 20 \
+              --user-agent "Mozilla/5.0" \
+              -o "./downloads/$filename" "$url"; then
+
+              grep -v '^[[:space:]]*#' "./downloads/$filename" \
+                | sed '/^$/d' >> mobile-whitelist-1.txt
+
+              echo "Добавлено: $url"
+            else
+              echo "Ошибка скачивания: $url" >&2
             fi
+
+            rm -f "./downloads/$filename"
           done < sources.txt
 
-          # Декодирование Base64 из списка URL в Base64.txt
-          echo "Обработка Base64 источников из Base64.txt..."
-          if [ ! -f Base64.txt ]; then
-            echo "Файл Base64.txt не найден, пропускаем Base64-декодирование."
-          else
+
+          echo "Обработка Base64 источников..."
+
+          if [ -f Base64.txt ]; then
             while IFS= read -r base64_url || [ -n "$base64_url" ]; do
               [[ -z "$base64_url" || "$base64_url" =~ ^[[:space:]]*# ]] && continue
               base64_url=$(echo "$base64_url" | xargs)
-              if [[ -n "$base64_url" ]]; then
-                b64_filename="b64_$(date +%s%N)_$RANDOM.tmp"
-                echo "Скачивание Base64: $base64_url"
-                if curl -L -f --fail-early --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -o "./downloads/$b64_filename" "$base64_url"; then
-                  base64 --decode "./downloads/$b64_filename" 2>/dev/null | grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt
-                  echo "Base64 успешно декодирован и добавлен: $base64_url"
+
+              b64_file="./downloads/b64_$(date +%s%N)_$RANDOM.tmp"
+
+              echo "Скачивание Base64: $base64_url"
+
+              if curl -L -f --fail-early \
+                --connect-timeout 10 --max-time 20 \
+                --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+                -o "$b64_file" "$base64_url"; then
+
+                # Проверка что это похоже на base64 VLESS
+                if grep -q "dmxlc3M" "$b64_file"; then
+
+                  # Убираем переносы → декодируем → чистим
+                  cat "$b64_file" \
+                    | tr -d '\r\n' \
+                    | base64 -d 2>/dev/null \
+                    | grep -v '^[[:space:]]*#' \
+                    | sed '/^$/d' >> mobile-whitelist-1.txt
+
+                  echo "Base64 успешно декодирован: $base64_url"
+
                 else
-                  echo "Ошибка скачивания Base64: $base64_url" >&2
+                  echo "⚠ Не похоже на Base64/VLESS: $base64_url"
                 fi
-                rm -f "./downloads/$b64_filename"
+
+              else
+                echo "Ошибка скачивания Base64: $base64_url" >&2
               fi
+
+              rm -f "$b64_file"
+
             done < Base64.txt
+          else
+            echo "Base64.txt не найден — пропуск"
           fi
 
-          # Финальная очистка
-          sed -i '/^$/d' mobile-whitelist-1.txt
 
-      - name: Сохранить собранный файл для проверки
+          # Финальная очистка + удаление дублей
+          sed -i '/^$/d' mobile-whitelist-1.txt
+          sort -u mobile-whitelist-1.txt -o mobile-whitelist-1.txt
+
+      - name: Сохранить собранный файл
         uses: actions/upload-artifact@v4
         with:
           name: raw-whitelist
           path: mobile-whitelist-1.txt
+
 
   test-and-filter:
     needs: collect-sources
@@ -90,38 +121,38 @@ jobs:
         with:
           name: raw-whitelist
 
-      - name: Скачать и установить Xray-core
+      - name: Установить Xray-core
         run: |
           wget -q https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip -O xray.zip
           unzip -q xray.zip
           chmod +x xray
           sudo mv xray /usr/local/bin/
-          echo "Xray-core установлен: $(xray version | head -n 1)"
+          echo "Xray: $(xray version | head -n 1)"
 
-      - name: Запустить проверку ссылок через Xray-core
+      - name: Проверка ссылок
         run: python3 check_links.py
 
-      - name: Обновить файл на GitVerse (только рабочие ссылки)
+      - name: Обновить GitVerse
         run: |
-          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
+          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git repo
 
           if [ -f working_whitelist.txt ]; then
-            cp -f working_whitelist.txt ./repo/mobile-whitelist-1.txt
+            cp -f working_whitelist.txt repo/mobile-whitelist-1.txt
           else
-            cp -f mobile-whitelist-1.txt ./repo/mobile-whitelist-1.txt
+            cp -f mobile-whitelist-1.txt repo/mobile-whitelist-1.txt
           fi
 
-          echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./repo/mobile-whitelist-1.txt
+          echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> repo/mobile-whitelist-1.txt
 
-          cd ./repo
+          cd repo
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
 
           git add mobile-whitelist-1.txt
 
-          if git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
+          if git commit -m "auto update $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
             git push
-            echo "✅ Файл с проверенными ссылками успешно отправлен на GitVerse"
+            echo "✅ Обновлено"
           else
-            echo "Нет изменений после проверки"
+            echo "Нет изменений"
           fi
