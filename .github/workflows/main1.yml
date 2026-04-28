@@ -1,3 +1,5 @@
+name: Скачивать, проверять и обновлять mobile-whitelist-1.txt на GitVerse
+
 on:
   schedule:
     - cron: '*/40 * * * *'
