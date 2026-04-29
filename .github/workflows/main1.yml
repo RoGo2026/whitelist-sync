@@ -17,67 +17,54 @@ jobs:
       - name: Checkout GitHub repository
         uses: actions/checkout@v4
 
-      - name: Скачать источники и создать чистый mobile-whitelist-1.txt
+      - name: Сбор всех источников
         run: |
           mkdir -p ./downloads
           > mobile-whitelist-1.txt
 
-          # --- БЛОК 1: Извлечение ключей из accargame (Усиленная маскировка) ---
-          echo "Попытка извлечения ключей из accargame..."
-          
-          # Мы добавляем заголовок Referer и имитируем сессию, чтобы сайт не выдал 403
-          ACCAR_HTML=$(curl -sL --max-time 20 \
-            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36" \
-            -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8" \
+          echo "Шаг 1: Извлечение ключей из accargame (Логика PowerShell)..."
+          # Максимальная имитация браузера для обхода 403/пустой страницы
+          ACCAR_HTML=$(curl -sL --max-time 30 \
+            -H "Authority: accargame.cfd" \
+            -H "Upgrade-Insecure-Requests: 1" \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" \
+            -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8" \
+            -H "Sec-Fetch-Site: none" \
+            -H "Sec-Fetch-Mode: navigate" \
+            -H "Sec-Fetch-User: ?1" \
+            -H "Sec-Fetch-Dest: document" \
             -H "Accept-Language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7" \
-            -H "Referer: https://accargame.cfd/" \
-            -H "DNT: 1" \
             "https://accargame.cfd/sub/opn-OowpWVHaChrr" || echo "")
-          
-          if [ -n "$ACCAR_HTML" ]; then
+
+          if [ -z "$ACCAR_HTML" ] || [ ${#ACCAR_HTML} -lt 200 ]; then
+            echo "Критическая ошибка: Сайт заблокировал запрос от GitHub (пустой ответ)."
+          else
             python3 -c "
           import re, base64, sys
           html = sys.stdin.read()
-          # Ищем все строки длиной от 40 символов, похожие на Base64
-          potential_b64 = re.findall(r'[A-Za-z0-9+/=]{40,}', html)
-          found_any = False
-          for b in potential_b64:
+          # Регулярка из твоего PS1: поиск Base64 блоков
+          matches = re.findall(r'[A-Za-z0-9+/=]{50,}', html)
+          if matches:
+              # Твоя логика: берем самый длинный блок
+              longest = max(matches, key=len)
               try:
-                  # Добавляем паддинг, если его не хватает
-                  missing_padding = len(b) % 4
-                  if missing_padding: b += '=' * (4 - missing_padding)
-                  
-                  decoded = base64.b64decode(b).decode('utf-8', errors='ignore')
+                  missing_padding = len(longest) % 4
+                  if missing_padding: longest += '=' * (4 - missing_padding)
+                  decoded = base64.b64decode(longest).decode('utf-8', errors='ignore')
                   if 'vless://' in decoded:
-                      print(decoded)
-                      found_any = True
-              except:
-                  continue
-          if found_any:
-              sys.stderr.write('Ключи с accargame успешно найдены и добавлены.\n')
-          else:
-              sys.stderr.write('Ключи на странице не обнаружены. Проверьте структуру сайта.\n')
+                      print(decoded.strip())
+              except: pass
           " <<< "$ACCAR_HTML" >> mobile-whitelist-1.txt
           fi
 
-          # --- БЛОК 2: Стандартная обработка источников из sources.txt ---
-          if [ ! -f sources.txt ]; then
-            echo "Ошибка: sources.txt не найден!" >&2
-            exit 1
-          fi
-
-          echo "Обработка источников из sources.txt..."
+          echo "Шаг 2: Обработка источников из sources.txt..."
           while IFS= read -r url || [ -n "$url" ]; do
             [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]] && continue
             url=$(echo "$url" | xargs)
-            if [[ -n "$url" ]]; then
-              filename=$(basename "$url" | sed 's/[^a-zA-Z0-9._-]/-/g')
-              if curl -L -f --fail-early --max-time 20 -H "User-Agent: Mozilla/5.0" -o "./downloads/$filename" "$url"; then
-                grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
-                echo "Добавлено: $url"
-              else
-                echo "Ошибка: $url" >&2
-              fi
+            filename=$(basename "$url" | sed 's/[^a-zA-Z0-9._-]/-/g')
+            if curl -L -f --fail-early --max-time 20 -H "User-Agent: Mozilla/5.0" -o "./downloads/$filename" "$url"; then
+              grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
+              echo "Добавлено: $url"
             fi
           done < sources.txt
 
@@ -107,24 +94,21 @@ jobs:
           chmod +x xray
           sudo mv xray /usr/local/bin/
 
-      - name: Запустить проверку ссылок через Xray-core (check_links.py)
+      - name: Запустить проверку ссылок (check_links.py)
         run: python3 check_links.py
 
       - name: Обновить файл на GitVerse
         run: |
           git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
-          
           if [ -f working_whitelist.txt ]; then
             cp -f working_whitelist.txt ./repo/mobile-whitelist-1.txt
           else
             cp -f mobile-whitelist-1.txt ./repo/mobile-whitelist-1.txt
           fi
-
-          echo -e "\n# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./repo/mobile-whitelist-1.txt
-
+          echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./repo/mobile-whitelist-1.txt
           cd ./repo
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
           git add mobile-whitelist-1.txt
-          git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC') [skip ci]" || echo "No changes"
+          git commit -m "auto update $(date -u +'%Y-%m-%d %H:%M:%S UTC') [skip ci]" || echo "No changes"
           git push
