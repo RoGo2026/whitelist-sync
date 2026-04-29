@@ -22,11 +22,11 @@ jobs:
           mkdir -p ./downloads
           > mobile-whitelist-1.txt
 
-          # --- Блок извлечения из accargame.cfd (Маскировка) ---
+          # --- БЛОК 1: Извлечение ключей из accargame (с маскировкой) ---
           echo "Извлечение ключей из accargame..."
           ACCAR_HTML=$(curl -sL --max-time 20 \
             -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
-            -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8" \
+            -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" \
             "https://accargame.cfd/sub/opn-OowpWVHaChrr" || echo "")
           
           if [ -n "$ACCAR_HTML" ]; then
@@ -42,23 +42,25 @@ jobs:
                       print(decoded)
           except: pass
           " <<< "$ACCAR_HTML" >> mobile-whitelist-1.txt
+            echo "Ключи из accargame добавлены."
           fi
-          # ---------------------------------------------------
 
+          # --- БЛОК 2: Твоя стандартная обработка источников из sources.txt ---
           if [ ! -f sources.txt ]; then
-            echo "Ошибка: sources.txt не найден!" >&2
+            echo "Ошибка: файл sources.txt не найден!" >&2
             exit 1
           fi
 
-          echo "Обработка стандартных источников из sources.txt..."
+          echo "Обработка источников из sources.txt..."
           while IFS= read -r url || [ -n "$url" ]; do
             if [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]]; then
               continue
             fi
             url=$(echo "$url" | xargs)
             if [[ -n "$url" ]]; then
+              # Генерация безопасного имени файла
               filename=$(basename "$url" | sed 's/[^a-zA-Z0-9._-]/-/g')
-              if curl -L -f --fail-early --max-time 20 -A "Mozilla/5.0" -o "./downloads/$filename" "$url"; then
+              if curl -L -f --fail-early --max-time 20 -H "User-Agent: Mozilla/5.0" -o "./downloads/$filename" "$url"; then
                 grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
                 echo "Добавлено: $url"
               else
@@ -66,20 +68,6 @@ jobs:
               fi
             fi
           done < sources.txt
-
-      - name: Установка Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Установка зависимостей Playwright
-        run: |
-          npm install playwright
-          npx playwright install chromium --with-deps
-
-      - name: Запустить fetch-configs.js (Playwright)
-        run: node fetch-configs.js
-        continue-on-error: true
 
       - name: Загрузить результат как артефакт
         uses: actions/upload-artifact@v4
@@ -108,13 +96,14 @@ jobs:
           sudo mv xray /usr/local/bin/
           echo "Xray-core установлен."
 
-      - name: Запустить проверку ссылок через Xray-core
+      - name: Запустить проверку ссылок через Xray-core (check_links.py)
         run: python3 check_links.py
 
-      - name: Обновить файл на GitVerse (только рабочие ссылки)
+      - name: Обновить файл на GitVerse
         run: |
           git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
 
+          # Выбираем рабочий файл (если чекер что-то нашел) или полный
           if [ -f working_whitelist.txt ]; then
             cp -f working_whitelist.txt ./repo/mobile-whitelist-1.txt
           else
@@ -127,5 +116,9 @@ jobs:
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
           git add mobile-whitelist-1.txt
-          git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC') [skip ci]" || echo "No changes"
-          git push
+
+          if git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC') [skip ci]"; then
+            git push
+          else
+            echo "Нет изменений для коммита."
+          fi
