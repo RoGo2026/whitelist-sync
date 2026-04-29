@@ -22,21 +22,58 @@ jobs:
           mkdir -p ./downloads
           > mobile-whitelist-1.txt
 
+          # --- Блок извлечения из accargame.cfd (Маскировка под браузер) ---
+          echo "Извлечение ключей из accargame с маскировкой под браузер..."
+          
+          # Используем расширенные заголовки, чтобы сайт не понял, что заходит GitHub
+          ACCAR_HTML=$(curl -sL --max-time 20 \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+            -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8" \
+            -H "Accept-Language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7" \
+            -H "Cache-Control: no-cache" \
+            -H "Pragma: no-cache" \
+            "https://accargame.cfd/sub/opn-OowpWVHaChrr" || echo "")
+          
+          if [ -n "$ACCAR_HTML" ] && [[ "$ACCAR_HTML" == *"html"* || "$ACCAR_HTML" == *"body"* || ${#ACCAR_HTML} -gt 100 ]]; then
+            python3 -c "
+          import re, base64, sys
+          try:
+              html = sys.stdin.read()
+              # Ищем блоки Base64, которые могут содержать vless://
+              matches = re.findall(r'[A-Za-z0-9+/=]{50,}', html)
+              if matches:
+                  # Берем самый длинный блок (обычно это список ключей)
+                  longest = max(matches, key=len)
+                  decoded = base64.b64decode(longest).decode('utf-8', errors='ignore')
+                  if 'vless://' in decoded:
+                      print(decoded)
+                      sys.stderr.write('Ключи успешно извлечены из Base64.\n')
+                  else:
+                      sys.stderr.write('В декодированном блоке не найдено ссылок vless.\n')
+              else:
+                  sys.stderr.write('Base64 данные не найдены в HTML.\n')
+          except Exception as e:
+              sys.stderr.write(f'Ошибка обработки: {e}\n')
+          " <<< "$ACCAR_HTML" >> mobile-whitelist-1.txt
+          else
+            echo "Внимание: Сайт отдал пустой или подозрительный ответ. Возможно, IP заблокирован."
+          fi
+          # ---------------------------------------------------------------
+
           if [ ! -f sources.txt ]; then
-            echo "Ошибка: файл sources.txt не найден в корне репозитория!" >&2
+            echo "Ошибка: sources.txt не найден!" >&2
             exit 1
           fi
 
-          echo "Обработка источников из sources.txt..."
-
+          echo "Обработка стандартных источников из sources.txt..."
           while IFS= read -r url || [ -n "$url" ]; do
             if [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]]; then
               continue
             fi
             url=$(echo "$url" | xargs)
             if [[ -n "$url" ]]; then
-              filename=$(basename "$url")
-              if curl -L -f --fail-early -o "./downloads/$filename" "$url"; then
+              filename=$(basename "$url" | sed 's/[^a-zA-Z0-9._-]/-/g')
+              if curl -L -f --fail-early --max-time 20 -A "Mozilla/5.0" -o "./downloads/$filename" "$url"; then
                 grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
                 echo "Добавлено: $url"
               else
@@ -45,44 +82,32 @@ jobs:
             fi
           done < sources.txt
 
-          # Декодирование Base64 из списка URL в Base64.txt
-          echo "Обработка Base64 источников из Base64.txt..."
-          if [ ! -f Base64.txt ]; then
-            echo "Файл Base64.txt не найден, пропускаем Base64-декодирование."
-          else
-            while IFS= read -r base64_url || [ -n "$base64_url" ]; do
-              [[ -z "$base64_url" || "$base64_url" =~ ^[[:space:]]*# ]] && continue
-              base64_url=$(echo "$base64_url" | xargs)
-              if [[ -n "$base64_url" ]]; then
-                b64_filename="b64_$(date +%s%N)_$RANDOM.tmp"
-                echo "Скачивание Base64: $base64_url"
-                if curl -L -f --fail-early --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -o "./downloads/$b64_filename" "$base64_url"; then
-                  base64 --decode "./downloads/$b64_filename" 2>/dev/null | grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt
-                  echo "Base64 успешно декодирован и добавлен: $base64_url"
-                else
-                  echo "Ошибка скачивания Base64: $base64_url" >&2
-                fi
-                rm -f "./downloads/$b64_filename"
-              fi
-            done < Base64.txt
-          fi
+      - name: Установка Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-          # Финальная очистка
-          sed -i '/^$/d' mobile-whitelist-1.txt
+      - name: Установка зависимостей Playwright
+        run: |
+          npm install playwright
+          npx playwright install chromium --with-deps
 
-      - name: Сохранить собранный файл для проверки
-        uses: actions/upload-artifact@v4
+      - name: Запустить fetch-configs.js (Playwright)
+        run: node fetch-configs.js
+        continue-on-error: true
+
+      - name: Загрузить результат как артефакт
+        uses: actions/artifacts@v4
         with:
           name: raw-whitelist
           path: mobile-whitelist-1.txt
 
-  test-and-filter:
+  check-and-deploy:
     needs: collect-sources
     runs-on: ubuntu-latest
-    timeout-minutes: 25
 
     steps:
-      - name: Checkout repository
+      - name: Checkout GitHub repository
         uses: actions/checkout@v4
 
       - name: Скачать собранный файл
@@ -111,7 +136,7 @@ jobs:
             cp -f mobile-whitelist-1.txt ./repo/mobile-whitelist-1.txt
           fi
 
-          echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./repo/mobile-whitelist-1.txt
+          echo -e "\n# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./repo/mobile-whitelist-1.txt
 
           cd ./repo
           git config user.name "GitHub Action Bot"
@@ -119,9 +144,8 @@ jobs:
 
           git add mobile-whitelist-1.txt
 
-          if git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
+          if git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC') [skip ci]"; then
             git push
-            echo "✅ Файл с проверенными ссылками успешно отправлен на GitVerse"
           else
-            echo "Нет изменений после проверки"
+            echo "Изменений нет."
           fi
