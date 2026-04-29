@@ -22,49 +22,61 @@ jobs:
           mkdir -p ./downloads
           > mobile-whitelist-1.txt
 
-          # --- БЛОК 1: Извлечение ключей из accargame (с маскировкой) ---
-          echo "Извлечение ключей из accargame..."
+          # --- БЛОК 1: Извлечение ключей из accargame (Усиленная маскировка) ---
+          echo "Попытка извлечения ключей из accargame..."
+          
+          # Мы добавляем заголовок Referer и имитируем сессию, чтобы сайт не выдал 403
           ACCAR_HTML=$(curl -sL --max-time 20 \
-            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
-            -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36" \
+            -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8" \
+            -H "Accept-Language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7" \
+            -H "Referer: https://accargame.cfd/" \
+            -H "DNT: 1" \
             "https://accargame.cfd/sub/opn-OowpWVHaChrr" || echo "")
           
           if [ -n "$ACCAR_HTML" ]; then
             python3 -c "
           import re, base64, sys
-          try:
-              html = sys.stdin.read()
-              matches = re.findall(r'[A-Za-z0-9+/=]{50,}', html)
-              if matches:
-                  longest = max(matches, key=len)
-                  decoded = base64.b64decode(longest).decode('utf-8', errors='ignore')
+          html = sys.stdin.read()
+          # Ищем все строки длиной от 40 символов, похожие на Base64
+          potential_b64 = re.findall(r'[A-Za-z0-9+/=]{40,}', html)
+          found_any = False
+          for b in potential_b64:
+              try:
+                  # Добавляем паддинг, если его не хватает
+                  missing_padding = len(b) % 4
+                  if missing_padding: b += '=' * (4 - missing_padding)
+                  
+                  decoded = base64.b64decode(b).decode('utf-8', errors='ignore')
                   if 'vless://' in decoded:
                       print(decoded)
-          except: pass
+                      found_any = True
+              except:
+                  continue
+          if found_any:
+              sys.stderr.write('Ключи с accargame успешно найдены и добавлены.\n')
+          else:
+              sys.stderr.write('Ключи на странице не обнаружены. Проверьте структуру сайта.\n')
           " <<< "$ACCAR_HTML" >> mobile-whitelist-1.txt
-            echo "Ключи из accargame добавлены."
           fi
 
-          # --- БЛОК 2: Твоя стандартная обработка источников из sources.txt ---
+          # --- БЛОК 2: Стандартная обработка источников из sources.txt ---
           if [ ! -f sources.txt ]; then
-            echo "Ошибка: файл sources.txt не найден!" >&2
+            echo "Ошибка: sources.txt не найден!" >&2
             exit 1
           fi
 
           echo "Обработка источников из sources.txt..."
           while IFS= read -r url || [ -n "$url" ]; do
-            if [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]]; then
-              continue
-            fi
+            [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]] && continue
             url=$(echo "$url" | xargs)
             if [[ -n "$url" ]]; then
-              # Генерация безопасного имени файла
               filename=$(basename "$url" | sed 's/[^a-zA-Z0-9._-]/-/g')
               if curl -L -f --fail-early --max-time 20 -H "User-Agent: Mozilla/5.0" -o "./downloads/$filename" "$url"; then
                 grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
                 echo "Добавлено: $url"
               else
-                echo "Ошибка скачивания: $url" >&2
+                echo "Ошибка: $url" >&2
               fi
             fi
           done < sources.txt
@@ -94,7 +106,6 @@ jobs:
           unzip -q xray.zip
           chmod +x xray
           sudo mv xray /usr/local/bin/
-          echo "Xray-core установлен."
 
       - name: Запустить проверку ссылок через Xray-core (check_links.py)
         run: python3 check_links.py
@@ -102,8 +113,7 @@ jobs:
       - name: Обновить файл на GitVerse
         run: |
           git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
-
-          # Выбираем рабочий файл (если чекер что-то нашел) или полный
+          
           if [ -f working_whitelist.txt ]; then
             cp -f working_whitelist.txt ./repo/mobile-whitelist-1.txt
           else
@@ -116,9 +126,5 @@ jobs:
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
           git add mobile-whitelist-1.txt
-
-          if git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC') [skip ci]"; then
-            git push
-          else
-            echo "Нет изменений для коммита."
-          fi
+          git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC') [skip ci]" || echo "No changes"
+          git push
