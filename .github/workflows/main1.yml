@@ -22,43 +22,28 @@ jobs:
           mkdir -p ./downloads
           > mobile-whitelist-1.txt
 
-          # --- Блок извлечения из accargame.cfd (Маскировка под браузер) ---
-          echo "Извлечение ключей из accargame с маскировкой под браузер..."
-          
-          # Используем расширенные заголовки, чтобы сайт не понял, что заходит GitHub
+          # --- Блок извлечения из accargame.cfd (Маскировка) ---
+          echo "Извлечение ключей из accargame..."
           ACCAR_HTML=$(curl -sL --max-time 20 \
             -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
             -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8" \
-            -H "Accept-Language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7" \
-            -H "Cache-Control: no-cache" \
-            -H "Pragma: no-cache" \
             "https://accargame.cfd/sub/opn-OowpWVHaChrr" || echo "")
           
-          if [ -n "$ACCAR_HTML" ] && [[ "$ACCAR_HTML" == *"html"* || "$ACCAR_HTML" == *"body"* || ${#ACCAR_HTML} -gt 100 ]]; then
+          if [ -n "$ACCAR_HTML" ]; then
             python3 -c "
           import re, base64, sys
           try:
               html = sys.stdin.read()
-              # Ищем блоки Base64, которые могут содержать vless://
               matches = re.findall(r'[A-Za-z0-9+/=]{50,}', html)
               if matches:
-                  # Берем самый длинный блок (обычно это список ключей)
                   longest = max(matches, key=len)
                   decoded = base64.b64decode(longest).decode('utf-8', errors='ignore')
                   if 'vless://' in decoded:
                       print(decoded)
-                      sys.stderr.write('Ключи успешно извлечены из Base64.\n')
-                  else:
-                      sys.stderr.write('В декодированном блоке не найдено ссылок vless.\n')
-              else:
-                  sys.stderr.write('Base64 данные не найдены в HTML.\n')
-          except Exception as e:
-              sys.stderr.write(f'Ошибка обработки: {e}\n')
+          except: pass
           " <<< "$ACCAR_HTML" >> mobile-whitelist-1.txt
-          else
-            echo "Внимание: Сайт отдал пустой или подозрительный ответ. Возможно, IP заблокирован."
           fi
-          # ---------------------------------------------------------------
+          # ---------------------------------------------------
 
           if [ ! -f sources.txt ]; then
             echo "Ошибка: sources.txt не найден!" >&2
@@ -97,7 +82,7 @@ jobs:
         continue-on-error: true
 
       - name: Загрузить результат как артефакт
-        uses: actions/artifacts@v4
+        uses: actions/upload-artifact@v4
         with:
           name: raw-whitelist
           path: mobile-whitelist-1.txt
@@ -121,7 +106,7 @@ jobs:
           unzip -q xray.zip
           chmod +x xray
           sudo mv xray /usr/local/bin/
-          echo "Xray-core установлен: $(xray version | head -n 1)"
+          echo "Xray-core установлен."
 
       - name: Запустить проверку ссылок через Xray-core
         run: python3 check_links.py
@@ -141,11 +126,6 @@ jobs:
           cd ./repo
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
-
           git add mobile-whitelist-1.txt
-
-          if git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC') [skip ci]"; then
-            git push
-          else
-            echo "Изменений нет."
-          fi
+          git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC') [skip ci]" || echo "No changes"
+          git push
