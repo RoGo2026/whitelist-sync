@@ -4,8 +4,9 @@ https://gist.githubusercontent.com/RoGo2026/651730bc8162b0773f53cc87564a2330/raw
 https://gist.githubusercontent.com/RoGo2026/651730bc8162b0773f53cc87564a2330/raw/b7f9b990d8a195b1418e7ae13bb5fb0bf48a0923/gistfile4.txt
 https://raw.githubusercontent.com/ksenkovsolo/HardVPN-bypass-WhiteLists-/refs/heads/main/vpn-lte/subscriptions/1sub.txt
 https://raw.githubusercontent.com/ShadowException/VPN/refs/heads/main/configs/VPN-cat-top-100
+https://raw.githubusercontent.com/barry-far/V2ray-Config/refs/heads/main/Sub1.txt
+https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt
 # https://raw.githubusercontent.com/RoGo2026/whitelist-sync/refs/heads/main/VPN-Vless.txt
-# https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt
 # https://raw.githubusercontent.com/VP01596/vless-top15/refs/heads/main/AllNW.txt
 # https://raw.githubusercontent.com/V2RayRoot/V2RayConfig/refs/heads/main/Config/vless.txt
 # https://raw.githubusercontent.com/expressalaki/ExpressVPN/main/configs.txt
