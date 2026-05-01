@@ -6,9 +6,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # ───────── НАСТРОЙКИ ─────────
 INPUT = "mobile-whitelist-1.txt"
 OUTPUT = "working_whitelist.txt"
-MAX_WORKERS = 30
-TEST_TIMEOUT = 2  # Увеличено для стабильности DNS и Handshake
-MAX_LATENCY_MS = 250
+MAX_WORKERS = 20
+TEST_TIMEOUT = 2
+MAX_LATENCY_MS = 100
 # ─────────────────────────────
 
 def dns_resolve_check(hostname):
