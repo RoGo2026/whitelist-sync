@@ -79,10 +79,12 @@ def start_xray(cfg, base_port):
 
 def http_test(socks_port, timeout):
     try:
-        cmd = ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "-x", f"socks5h://127.0.0.1:{socks_port}", "--connect-timeout", str(timeout), "-m", str(timeout), "https://www.github.com"]
+        # Добавлен флаг -L (follow redirects) и проверка кода 200
+        cmd = ["curl", "-s", "-L", "-o", "/dev/null", "-w", "%{http_code}", "-x", f"socks5h://127.0.0.1:{socks_port}", "--connect-timeout", str(timeout), "-m", str(timeout), "https://cp.cloudflare.com"]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout+2)
         code = result.stdout.strip()
-        return code in ("204", "301", "302", "429")
+        # Теперь 200 — это успех (Cloudflare возвращает 200)
+        return code in ("200", "204", "301", "302", "429")
     except:
         return False
 
@@ -147,7 +149,7 @@ def main():
             print("No links")
             open(OUTPUT, "w").close()
             return
-        print(f"Checking {len(links)} proxies (TCP+TLS+HTTP)...")
+        print(f"Checking {len(links)} proxies using Cloudflare (TCP+TLS+HTTP)...")
         working = []
         with ThreadPoolExecutor(max_workers=WORKERS) as ex:
             futs = {ex.submit(test_proxy, ln, 12000 + i): ln for i, ln in enumerate(links)}
