@@ -5,8 +5,8 @@ vless://b6ce8a51-19b9-4979-91ba-b4298c26d5fc@109.120.191.171:443?mode=gun&securi
 vless://c9bcaa3b283043ba9533ac1f125681d2@158.160.53.49:443?security=reality&encryption=none&alpn=h2&pbk=V6ECpXUwUB-JoDMo2VuxlRXbNcvtyNzCe8Q4PV4wmBA&headerType=none&fp=random&allowinsecure=0&type=tcp&flow=xtls-rprx-vision&sni=ya.ru&sid=aabbccdd#%F0%9F%87%B5%F0%9F%87%B1Poland+%D0%9D%D0%B5%D0%B9%D1%80%D0%BE+-+Lexa+Vercel
 vless://9653e32201d844dcb7ddacaa31f8c2a4@158.160.42.76:443?security=reality&encryption=none&alpn=h2&pbk=LJNnUvwueS6eZoKKM176ll9CzecYbhRqq_bWTZ96NHc&headerType=none&fp=random&allowinsecure=0&type=tcp&flow=xtls-rprx-vision&sni=ya.ru&sid=aabbccdd#%F0%9F%87%AA%F0%9F%87%B8Spain+%D0%9D%D0%B5%D0%B9%D1%80%D0%BE+-+Lexa+Vercel
 vless://1ffd6c7c2cdc4ea2a081c2d165f86748@158.160.103.135:443?security=reality&encryption=none&alpn=h2&pbk=sRrMtKv-bES_2G0RtCwxch1fvxKjt3C5xJcnNQX9pUs&headerType=none&fp=random&allowinsecure=0&type=tcp&flow=xtls-rprx-vision&sni=ya.ru&sid=aabbccdd#%F0%9F%87%B3%F0%9F%87%B1Amsterdam+%D0%9D%D0%B5%D0%B9%D1%80%D0%BE+-+Lexa+Vercel
-
-
+vless://75807638-6f19-07d0-ae08-38492ee85c88@178.72.181.41:52006?security=tls&encryption=none&headerType=none&fp=chrome&allowinsecure=1&type=tcp&flow=xtls-rprx-vision&sni=178.72.181.41#%F0%9F%87%B7%F0%9F%87%BA+Russia+%D0%9D%D0%B5%D0%B9%D1%80%D0%BE+-+Lexa+Vercel+4
+vless://75807638-6f19-07d0-ae08-38492ee85c88@cl-ru-1.edgeflux.ru:52006?security=tls&encryption=none&headerType=none&fp=chrome&allowinsecure=1&type=tcp&flow=xtls-rprx-vision&sni=cl-ru-1.edgeflux.ru#%F0%9F%87%B7%F0%9F%87%BA+Russia+%D0%9D%D0%B5%D0%B9%D1%80%D0%BE+-+Lexa+Vercel+3
 
 
 
