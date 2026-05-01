@@ -1,140 +1,203 @@
 #!/usr/bin/env python3
-import sys, os, socket, time, subprocess, json, signal, base64, shutil
+import sys, os, socket, time, ssl, http.client, secrets, base64
 from urllib.parse import urlparse, parse_qs, unquote
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# ==================== НАСТРОЙКИ (МЕНЯЙТЕ ТУТ) ====================
-INPUT = "mobile-whitelist-1.txt"  # Файл с ключами
-OUTPUT = "working_whitelist.txt"  # Файл для рабочих ключей
-CHECK_URL = "http://ya.ru" # Сайт для проверки
+# ───────── НАСТРОЙКИ ─────────
+INPUT = "mobile-whitelist-1.txt"
+OUTPUT = "working_whitelist.txt"
+MAX_WORKERS = 10
+TEST_TIMEOUT = 1.5
+MAX_LATENCY_MS = 500
+# ─────────────────────────────
 
-WORKERS = 30      # Количество одновременно проверяемых ключей (меньше = стабильнее)
+def dns_resolve_check(hostname):
+    """Проверка, резолвится ли домен в IP-адрес."""
+    try:
+        socket.gethostbyname(hostname)
+        return True
+    except:
+        return False
 
-# Тайм-ауты (в секундах)
-TIMEOUT_TCP = 2.0  # Ожидание отклика сервера (пинг)
-TIMEOUT_XRAY = 1.5 # Сколько ждать запуска ядра Xray перед тестом
-TIMEOUT_HTTP = 3.0 # Сколько ждать загрузки страницы (самый важный тайм-аут)
-
-# Порты
-START_PORT = 13000 # С какого порта начинать локальные прокси
-# =================================================================
-
-XRAY_PATH = shutil.which("xray") or "./xray"
+def ws_handshake_check(hostname, port, timeout):
+    """Упрощенная проверка WebSocket Handshake через HTTP Upgrade."""
+    try:
+        ws_key = base64.b64encode(secrets.token_bytes(16)).decode('utf-8')
+        conn = http.client.HTTPConnection(hostname, port, timeout=timeout)
+        headers = {
+            "Upgrade": "websocket",
+            "Connection": "Upgrade",
+            "Sec-WebSocket-Key": ws_key,
+            "Sec-WebSocket-Version": "13"
+        }
+        conn.request("GET", "/", headers=headers)
+        response = conn.getresponse()
+        is_ws = response.status == 101
+        conn.close()
+        return is_ws
+    except:
+        return False
 
 def parse_link(link):
     try:
         p = urlparse(link)
         q = parse_qs(p.query)
-        h, port = p.hostname, p.port
-        if not h or not port: return None, None
-        
-        cfg = {
-            "log": {"loglevel": "error"},
-            "inbounds": [{"port": 0, "listen": "127.0.0.1", "protocol": "socks", "settings": {"auth": "noauth", "udp": True}}],
-            "outbounds": []
-        }
-
+        h = p.hostname
+        port = p.port
+        if not h or not port:
+            return None, None
         if link.startswith("vless://"):
+            uid = p.username or ""
             sec = q.get("security", ["none"])[0]
-            v_out = {
+            cfg = {
                 "protocol": "vless",
-                "settings": {"vnext": [{"address": h, "port": port, "users": [{"id": p.username or "", "flow": q.get("flow", [""])[0], "encryption": "none"}]}]},
+                "settings": {"vnext": [{"address": h, "port": port, "users": [{"id": uid, "flow": q.get("flow", [""])[0]}]}]},
                 "streamSettings": {"network": q.get("type", ["tcp"])[0], "security": sec}
             }
             if sec in ("tls", "reality"):
-                v_out["streamSettings"]["tlsSettings"] = {
+                cfg["streamSettings"]["tlsSettings"] = {
                     "serverName": q.get("sni", [h])[0],
                     "fingerprint": q.get("fp", ["chrome"])[0],
                     "alpn": q.get("alpn", ["h2,http/1.1"])[0].split(",")
                 }
-                if sec == "reality":
-                    v_out["streamSettings"]["realitySettings"] = {"publicKey": q.get("pbk", [""])[0], "shortId": q.get("sid", [""])[0]}
-            cfg["outbounds"].append(v_out)
+            return cfg, "vless"
+        elif link.startswith("trojan://"):
+            pwd = unquote(p.username or "")
+            return {
+                "protocol": "trojan",
+                "settings": {"servers": [{"address": h, "port": port, "password": pwd}]},
+                "streamSettings": {"network": "tcp", "security": "tls", "tlsSettings": {"serverName": q.get("sni", [h])[0], "alpn": q.get("alpn", ["h2,http/1.1"])[0].split(",")}}
+            }, "trojan"
         elif link.startswith("ss://"):
             ui = p.username or ""
             try:
-                decoded = base64.b64decode(ui + "==").decode()
-                method, passwd = decoded.split(":", 1)
-            except: method, passwd = "chacha20-ietf-poly1305", ui
-            cfg["outbounds"].append({
+                mp = base64.b64decode(ui).decode() if "@" not in ui else ui.split("@")[0]
+            except:
+                mp = ui
+            pts = mp.split(":", 1)
+            return {
                 "protocol": "shadowsocks",
-                "settings": {"servers": [{"address": h, "port": port, "method": method, "password": passwd}]}
-            })
-        else: return None, None
-        return cfg, "ok"
-    except: return None, None
+                "settings": {"servers": [{"address": h, "port": port, "method": pts[0] if pts else "chacha20-ietf-poly1305", "password": pts[1] if len(pts) > 1 else ""}]}
+            }, "shadowsocks"
+    except:
+        pass
+    return None, None
 
-def http_test(port):
+def tcp_check(h, port, timeout):
     try:
-        # -sL (тихо + редиректы), -w (код), -m (макс время всей операции)
-        cmd = ["curl", "-sL", "-o", "/dev/null", "-w", "%{http_code}", 
-               "-x", f"socks5h://127.0.0.1:{port}", 
-               "--connect-timeout", str(int(TIMEOUT_HTTP/2)), 
-               "-m", str(TIMEOUT_HTTP), CHECK_URL]
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT_HTTP + 1)
-        # Если сайт вернул 200, 204 или редирект — прокси рабочий
-        return res.stdout.strip() in ("200", "204", "301", "302")
-    except: return False
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(timeout)
+        t0 = time.time()
+        r = s.connect_ex((h, port))
+        lat = round((time.time() - t0) * 1000, 1)
+        s.close()
+        return r == 0, lat
+    except:
+        return False, None
 
-def test_proxy(link, port):
-    res = {"link": link, "ok": False, "lat": 0, "msg": "fail"}
-    cfg, status = parse_link(link)
-    if not cfg: return {**res, "msg": "parse_err"}
-
-    # 1. Быстрый TCP чек (пингуем сервер)
+def tls_check(h, port, timeout):
     try:
-        addr = cfg["outbounds"][0]["settings"].get("vnext", cfg["outbounds"][0]["settings"].get("servers"))[0]["address"]
-        srv_port = cfg["outbounds"][0]["settings"].get("vnext", cfg["outbounds"][0]["settings"].get("servers"))[0]["port"]
-        start_t = time.time()
-        socket.create_connection((addr, srv_port), timeout=TIMEOUT_TCP).close()
-        res["lat"] = round((time.time() - start_t) * 1000)
-    except: return {**res, "msg": "dead_srv"}
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with socket.create_connection((h, port), timeout=timeout) as sock:
+            with ctx.wrap_socket(sock, server_hostname=h) as ssock:
+                return True
+    except:
+        return False
 
-    # 2. Запуск Xray
-    cfg["inbounds"][0]["port"] = port
-    cfg_file = f"/tmp/xr_{port}.json"
-    with open(cfg_file, "w") as f: json.dump(cfg, f)
+def test_proxy(link):
+    result = {"link": link, "ok": False, "latency": 0, "reason": ""}
+    cfg, proto = parse_link(link)
+    if not cfg:
+        result["reason"] = "parse"
+        return result
+
+    try:
+        if proto == "vless":
+            h = cfg["settings"]["vnext"][0]["address"]
+            p = cfg["settings"]["vnext"][0]["port"]
+            net_type = cfg["streamSettings"]["network"]
+        else:
+            h = cfg["settings"]["servers"][0]["address"]
+            p = cfg["settings"]["servers"][0]["port"]
+            net_type = "tcp"
+    except:
+        result["reason"] = "extract"
+        return result
+
+    # 1. DNS Проверка
+    if not h.replace('.', '').isdigit():
+        if not dns_resolve_check(h):
+            result["reason"] = "dns"
+            return result
     
-    try:
-        p = subprocess.Popen([XRAY_PATH, "run", "-config", cfg_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        time.sleep(TIMEOUT_XRAY) # Ждем прогрузки ядра
-        
-        if http_test(port):
-            res["ok"], res["msg"] = True, "active"
-        
-        p.terminate() # Сразу убиваем процесс после теста
-        p.wait(timeout=1)
-    except: pass
-    finally:
-        if os.path.exists(cfg_file): os.remove(cfg_file)
-    return res
+    # 2. TCP Проверка
+    ok, lat = tcp_check(h, p, TEST_TIMEOUT)
+    if not ok or lat is None:
+        result["reason"] = "tcp"
+        return result
+    
+    if lat > MAX_LATENCY_MS:
+        result["reason"] = "slow"
+        result["latency"] = lat
+        return result
+    
+    result["latency"] = lat
+
+    # 3. WebSocket Handshake (если указан тип ws)
+    if net_type == "ws" or "type=ws" in link:
+        if not ws_handshake_check(h, p, TEST_TIMEOUT):
+            result["reason"] = "ws_fail"
+            return result
+    
+    # 4. TLS Проверка
+    if "security=tls" in link or "security=reality" in link or proto == "trojan":
+        if not tls_check(h, p, TEST_TIMEOUT):
+            result["reason"] = "tls"
+            return result
+    
+    result["ok"] = True
+    result["reason"] = "ok"
+    return result
 
 def main():
-    # Перед началом убиваем старые процессы xray, чтобы порты были свободны
-    subprocess.run(["pkill", "-f", "xray"], stderr=subprocess.DEVNULL)
-    
-    if not os.path.exists(INPUT):
-        print(f"Файл {INPUT} не найден!"); return
-    
-    with open(INPUT, "r") as f:
-        links = [l.strip() for l in f if "://" in l]
+    try:
+        if not os.path.exists(INPUT):
+            print(f"File {INPUT} not found")
+            open(OUTPUT, "w").close()
+            return
+        with open(INPUT, "r", encoding="utf-8") as f:
+            links = [l.strip() for l in f if l.strip() and not l.startswith("#")]
+        if not links:
+            print("No links")
+            open(OUTPUT, "w").close()
+            return
 
-    print(f"Проверка {len(links)} ссылок. Потоков: {WORKERS}. Тайм-аут: {TIMEOUT_HTTP} сек.")
-    working = []
-    
-    with ThreadPoolExecutor(max_workers=WORKERS) as ex:
-        # Раздаем задачи. Каждый поток получает свой уникальный порт
-        futs = {ex.submit(test_proxy, links[i], START_PORT + i): i for i in range(len(links))}
-        for f in as_completed(futs):
-            r = f.result()
-            marker = "✅" if r["ok"] else "❌"
-            print(f"{marker} {r['lat']}ms | {r['msg']} | {r['link'][:40]}...")
-            if r["ok"]: working.append(r)
+        print(f"Checking {len(links)} proxies...")
+        working = []
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
+            futs = {ex.submit(test_proxy, ln): ln for ln in links}
+            for fut in as_completed(futs):
+                r = fut.result()
+                pv = r["link"][:45] + "..." if len(r["link"]) > 45 else r["link"]
+                if r["ok"]:
+                    working.append(r)
+                    print(f"OK ({r['latency']}ms): {pv}")
+                else:
+                    print(f"FAIL: {pv} | {r['reason']}")
 
-    working.sort(key=lambda x: x["lat"])
-    with open(OUTPUT, "w") as f:
-        for w in working: f.write(w["link"] + "\n")
-    print(f"\nГотово! Найдено рабочих: {len(working)}")
+        working.sort(key=lambda x: x["latency"])
+        with open(OUTPUT, "w", encoding="utf-8") as f:
+            for it in working:
+                f.write(it["link"] + "\n")
+        print(f"\nDone. Working: {len(working)}/{len(links)}")
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        if not os.path.exists(OUTPUT):
+            open(OUTPUT, "w").close()
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()
