@@ -8,7 +8,7 @@ INPUT = "mobile-whitelist-1.txt"
 OUTPUT = "working_whitelist.txt"
 MAX_WORKERS = 20
 TEST_TIMEOUT = 2
-MAX_LATENCY_MS = 100
+MAX_LATENCY_MS = 1000
 # ─────────────────────────────
 
 def dns_resolve_check(hostname):
