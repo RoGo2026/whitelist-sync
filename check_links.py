@@ -1,24 +1,37 @@
 #!/usr/bin/env python3
 import sys, os, socket, time, subprocess, json, signal, base64, shutil
+import urllib.request
 from urllib.parse import urlparse, parse_qs, unquote
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# ==================== МОБИЛЬНЫЕ НАСТРОЙКИ ====================
+# ==================== НАСТРОЙКИ АВТОМАТИЗАЦИИ ====================
+# Ссылка на исходный файл (замени на свою прямую ссылку на raw файл)
+SOURCE_URL = "https://gitverse.ru/api/v1/repos/user/repo/raw/mobile-whitelist-1.txt"
+
 INPUT = "mobile-whitelist-1.txt"
 OUTPUT = "working_whitelist.txt"
 
-# Используем стандартный Android-чек. Он легкий и быстрый.
 CHECK_URL = "http://connectivitycheck.gstatic.com/generate_204"
-
-WORKERS = 20      
-TIMEOUT_TCP = 1.5  # Если сервер не ответил за 1.5 сек, на мобиле он будет тупить
-TIMEOUT_XRAY = 2.0 
-TIMEOUT_HTTP = 3.0 # Максимум 5 секунд на полную загрузку через прокси
-
-START_PORT = 14000 
-# =============================================================
-
 XRAY_PATH = shutil.which("xray") or "./xray"
+
+WORKERS = 20
+TIMEOUT_HTTP = 3.0
+START_PORT = 15000
+# =================================================================
+
+def download_source():
+    """Скачивает свежий список ключей."""
+    print(f"📥 Скачивание списка из источника...")
+    try:
+        with urllib.request.urlopen(SOURCE_URL, timeout=10) as response:
+            content = response.read().decode('utf-8')
+            with open(INPUT, "w", encoding="utf-8") as f:
+                f.write(content)
+        print(f"✅ Файл успешно скачан.")
+        return True
+    except Exception as e:
+        print(f"❌ Ошибка скачивания: {e}")
+        return False
 
 def parse_link(link):
     try:
@@ -33,10 +46,10 @@ def parse_link(link):
             "outbounds": []
         }
 
-        # Базовые настройки для TLS (важно для обхода мобильных блокировок)
+        # Настройки для обхода DPI мобильных операторов
         tls_settings = {
             "serverName": q.get("sni", [h])[0],
-            "fingerprint": q.get("fp", ["chrome"])[0], # Эмуляция браузера
+            "fingerprint": q.get("fp", ["chrome"])[0],
             "alpn": ["h2", "http/1.1"]
         }
 
@@ -51,7 +64,6 @@ def parse_link(link):
                 v_out["streamSettings"]["tlsSettings"] = tls_settings
             elif sec == "reality":
                 v_out["streamSettings"]["realitySettings"] = {
-                    "show": False,
                     "fingerprint": "chrome",
                     "serverName": q.get("sni", [h])[0],
                     "publicKey": q.get("pbk", [""])[0],
@@ -75,81 +87,78 @@ def parse_link(link):
                 "settings": {"servers": [{"address": h, "port": port, "password": unquote(p.username or "")}]},
                 "streamSettings": {"network": "tcp", "security": "tls", "tlsSettings": tls_settings}
             })
-        else: return None, None
         return cfg, "ok"
     except: return None, None
 
 def http_test(port):
     try:
-        # Добавлен User-Agent, чтобы не палиться перед DPI
-        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        ua = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36"
         cmd = ["curl", "-sL", "-o", "/dev/null", "-w", "%{http_code}", 
-               "-A", user_agent,
-               "-x", f"socks5h://127.0.0.1:{port}", 
-               "--connect-timeout", "3", 
-               "-m", str(TIMEOUT_HTTP), CHECK_URL]
+               "-A", ua, "-x", f"socks5h://127.0.0.1:{port}", 
+               "--connect-timeout", "3", "-m", str(TIMEOUT_HTTP), CHECK_URL]
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT_HTTP + 1)
         return res.stdout.strip() in ("204", "200")
     except: return False
 
 def test_proxy(link, port):
-    res = {"link": link, "ok": False, "lat": 0, "msg": "fail"}
+    res = {"link": link, "ok": False, "lat": 0}
     cfg, status = parse_link(link)
-    if not cfg: return {**res, "msg": "parse_err"}
+    if not cfg: return res
 
-    # 1. TCP чек
+    # 1. TCP Check
     try:
         out = cfg["outbounds"][0]["settings"].get("vnext", cfg["outbounds"][0]["settings"].get("servers"))[0]
-        start_t = time.time()
-        socket.create_connection((out["address"], out["port"]), timeout=TIMEOUT_TCP).close()
-        res["lat"] = round((time.time() - start_t) * 1000)
-    except: return {**res, "msg": "timeout"}
+        st = time.time()
+        socket.create_connection((out["address"], out["port"]), timeout=2).close()
+        res["lat"] = round((time.time() - st) * 1000)
+    except: return res
 
-    # 2. Запуск Xray
+    # 2. Xray + HTTP Check
     cfg["inbounds"][0]["port"] = port
-    cfg_file = f"/tmp/xr_mob_{port}.json"
-    with open(cfg_file, "w") as f: json.dump(cfg, f)
+    tmp = f"/tmp/xr_{port}.json"
+    with open(tmp, "w") as f: json.dump(cfg, f)
     
     try:
-        p = subprocess.Popen([XRAY_PATH, "run", "-config", cfg_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        time.sleep(TIMEOUT_XRAY)
-        
-        if http_test(port):
-            res["ok"], res["msg"] = True, "active"
-        
+        p = subprocess.Popen([XRAY_PATH, "run", "-config", tmp], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(1.5)
+        if http_test(port): res["ok"] = True
         p.terminate()
         p.wait(timeout=1)
     except: pass
     finally:
-        if os.path.exists(cfg_file): os.remove(cfg_file)
+        if os.path.exists(tmp): os.remove(tmp)
     return res
 
 def main():
+    # Пред-очистка
     subprocess.run(["pkill", "-f", "xray"], stderr=subprocess.DEVNULL)
-    if not os.path.exists(INPUT):
-        print(f"Файл {INPUT} не найден!"); return
     
+    # 1. Обновляем исходник
+    if not download_source() and not os.path.exists(INPUT):
+        return
+
+    # 2. Читаем ключи
     with open(INPUT, "r") as f:
         links = [l.strip() for l in f if "://" in l]
 
-    print(f"Мобильная проверка: {len(links)} ссылок. Потоков: {WORKERS}")
+    print(f"🚀 Начинаем проверку {len(links)} ключей...")
     working = []
     
+    # 3. Проверка в потоках
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
         futs = {ex.submit(test_proxy, links[i], START_PORT + i): i for i in range(len(links))}
         for f in as_completed(futs):
             r = f.result()
-            marker = "📱" if r["ok"] else "✖️"
             if r["ok"]:
                 working.append(r)
-                print(f"{marker} {r['lat']}ms | {r['link'][:50]}...")
-            else:
-                pass # Не засоряем экран плохими ссылками
+                print(f"✅ {r['lat']}ms | {r['link'][:40]}...")
 
+    # 4. Сохранение результата
     working.sort(key=lambda x: x["lat"])
     with open(OUTPUT, "w") as f:
         for w in working: f.write(w["link"] + "\n")
-    print(f"\nГотово! Найдено для мобильного: {len(working)}")
+    
+    print(f"\n✨ Готово! Рабочих ключей сохранено: {len(working)}")
 
 if __name__ == "__main__":
     main()
