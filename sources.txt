@@ -1,17 +1,8 @@
-https://gist.githubusercontent.com/RoGo2026/651730bc8162b0773f53cc87564a2330/raw/b7f9b990d8a195b1418e7ae13bb5fb0bf48a0923/gistfile1.txt
-https://gist.githubusercontent.com/RoGo2026/651730bc8162b0773f53cc87564a2330/raw/b7f9b990d8a195b1418e7ae13bb5fb0bf48a0923/gistfile2.txt
-https://gist.githubusercontent.com/RoGo2026/651730bc8162b0773f53cc87564a2330/raw/b7f9b990d8a195b1418e7ae13bb5fb0bf48a0923/gistfile3.txt
-https://gist.githubusercontent.com/RoGo2026/651730bc8162b0773f53cc87564a2330/raw/b7f9b990d8a195b1418e7ae13bb5fb0bf48a0923/gistfile4.txt
-https://raw.githubusercontent.com/ksenkovsolo/HardVPN-bypass-WhiteLists-/refs/heads/main/vpn-lte/subscriptions/1sub.txt
+https://raw.githubusercontent.com/AirLinkVPN1/AirLinkVPN/refs/heads/main/rkn_white_list
 https://raw.githubusercontent.com/ShadowException/VPN/refs/heads/main/configs/VPN-cat-top-100
 https://raw.githubusercontent.com/barry-far/V2ray-Config/refs/heads/main/Sub1.txt
 https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt
-# https://gist.githubusercontent.com/RoGo2026/d2ec2bb7954b394d405bf09c654fe44e/raw/478aae00f0dfb3c6f71e4711a63b36a1fd10e0da/gistfile1.txt
-# https://gist.githubusercontent.com/RoGo2026/d2ec2bb7954b394d405bf09c654fe44e/raw/478aae00f0dfb3c6f71e4711a63b36a1fd10e0da/gistfile2.txt
-# https://gist.githubusercontent.com/RoGo2026/d2ec2bb7954b394d405bf09c654fe44e/raw/478aae00f0dfb3c6f71e4711a63b36a1fd10e0da/gistfile3.txt
-# https://gist.githubusercontent.com/RoGo2026/d2ec2bb7954b394d405bf09c654fe44e/raw/478aae00f0dfb3c6f71e4711a63b36a1fd10e0da/gistfile4.txt
-# https://gist.githubusercontent.com/RoGo2026/d2ec2bb7954b394d405bf09c654fe44e/raw/478aae00f0dfb3c6f71e4711a63b36a1fd10e0da/gistfile5.txt
-# https://gist.githubusercontent.com/RoGo2026/d2ec2bb7954b394d405bf09c654fe44e/raw/478aae00f0dfb3c6f71e4711a63b36a1fd10e0da/gistfile6.txt
+# https://raw.githubusercontent.com/ksenkovsolo/HardVPN-bypass-WhiteLists-/refs/heads/main/vpn-lte/subscriptions/1sub.txt
 # https://raw.githubusercontent.com/RoGo2026/whitelist-sync/refs/heads/main/VPN-Vless.txt
 # https://raw.githubusercontent.com/VP01596/vless-top15/refs/heads/main/AllNW.txt
 # https://raw.githubusercontent.com/V2RayRoot/V2RayConfig/refs/heads/main/Config/vless.txt
