@@ -79,7 +79,7 @@ def start_xray(cfg, base_port):
 
 def http_test(socks_port, timeout):
     try:
-        cmd = ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "-x", f"socks5h://127.0.0.1:{socks_port}", "--connect-timeout", str(timeout), "-m", str(timeout), "https://cp.cloudflare.com"]
+        cmd = ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "-x", f"socks5h://127.0.0.1:{socks_port}", "--connect-timeout", str(timeout), "-m", str(timeout), "https://www.github.com"]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout+2)
         code = result.stdout.strip()
         return code in ("204", "301", "302", "429")
