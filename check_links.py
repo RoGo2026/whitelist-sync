@@ -12,9 +12,9 @@ XRAY = "./xray" if os.path.exists("./xray") else shutil.which("xray")
 
 WORKERS = 30
 TIMEOUT_TCP = 2.0      
-TIMEOUT_XRAY_WAIT = 2.0 
-TIMEOUT_HTTP = 5.0      
-TEST_URL = "http://connectivitycheck.gstatic.com/generate_204"
+TIMEOUT_XRAY_WAIT = 1.5 
+TIMEOUT_HTTP = 3.0      
+TEST_URL = "http://ya.ru"
 # ─────────────────────────────────────
 
 def parse_link(link):
