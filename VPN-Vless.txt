@@ -7,7 +7,7 @@ vless://9653e32201d844dcb7ddacaa31f8c2a4@158.160.42.76:443?security=reality&encr
 vless://1ffd6c7c2cdc4ea2a081c2d165f86748@158.160.103.135:443?security=reality&encryption=none&alpn=h2&pbk=sRrMtKv-bES_2G0RtCwxch1fvxKjt3C5xJcnNQX9pUs&headerType=none&fp=random&allowinsecure=0&type=tcp&flow=xtls-rprx-vision&sni=ya.ru&sid=aabbccdd#%F0%9F%87%B3%F0%9F%87%B1Amsterdam+%D0%9D%D0%B5%D0%B9%D1%80%D0%BE+-+Lexa+Vercel
 vless://75807638-6f19-07d0-ae08-38492ee85c88@178.72.181.41:52006?security=tls&encryption=none&headerType=none&fp=chrome&allowinsecure=1&type=tcp&flow=xtls-rprx-vision&sni=178.72.181.41#%F0%9F%87%B7%F0%9F%87%BA+Russia+%D0%9D%D0%B5%D0%B9%D1%80%D0%BE+-+Lexa+Vercel+4
 vless://75807638-6f19-07d0-ae08-38492ee85c88@cl-ru-1.edgeflux.ru:52006?security=tls&encryption=none&headerType=none&fp=chrome&allowinsecure=1&type=tcp&flow=xtls-rprx-vision&sni=cl-ru-1.edgeflux.ru#%F0%9F%87%B7%F0%9F%87%BA+Russia+%D0%9D%D0%B5%D0%B9%D1%80%D0%BE+-+Lexa+Vercel+3
-
+vless://3c589c1d3a2d411990603535ed9aabfe@51.250.81.147:443?security=reality&encryption=none&alpn=h2&pbk=BBYEtlb7eOszGE6RkUsxTBPgoowhmfW7l7ganEddDiY&headerType=none&fp=random&allowinsecure=0&type=tcp&flow=xtls-rprx-vision&sni=ya.ru&sid=aabbccdd#%F0%9F%87%AD%F0%9F%87%B7%D0%9D%D0%B5%D0%B9%D1%80%D0%BE+-+Lexa+Vercel+%D0%A5%D0%BE%D1%80%D0%B2%D0%B0%D1%82%D0%B8%D1%8F
 
 
 
