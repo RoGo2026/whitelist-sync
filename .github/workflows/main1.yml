@@ -10,73 +10,71 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  collect-and-push:
+  collect-and-sync:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout GitHub repository
         uses: actions/checkout@v4
 
-      - name: Сбор ссылок из источников
+      - name: Сбор всех ссылок (без проверки)
         run: |
           mkdir -p ./downloads
           > mobile-whitelist-1.txt
 
-          # 1. Обработка обычных ссылок
+          # 1. Сбор из обычного списка sources.txt
           if [ -f sources.txt ]; then
-            echo "Обработка источников из sources.txt..."
+            echo "Чтение источников из sources.txt..."
             while IFS= read -r url || [ -n "$url" ]; do
               [[ -z "$url" || "$url" =~ ^[[:space:]]*# ]] && continue
               url=$(echo "$url" | xargs)
-              filename="src_$(date +%s%N)_$RANDOM.tmp"
-              if curl -L -f --fail-early -s -o "./downloads/$filename" "$url"; then
-                grep -v '^[[:space:]]*#' "./downloads/$filename" | sed '/^$/d' >> mobile-whitelist-1.txt
-                echo "Добавлено: $url"
-              else
-                echo "Ошибка скачивания: $url" >&2
+              tmp_file="src_$(date +%s%N).tmp"
+              if curl -L -f -s -o "./downloads/$tmp_file" "$url"; then
+                grep -v '^[[:space:]]*#' "./downloads/$tmp_file" | sed '/^$/d' >> mobile-whitelist-1.txt
+                echo "Загружено: $url"
               fi
             done < sources.txt
           fi
 
-          # 2. Обработка Base64 источников
+          # 2. Сбор из Base64 источников
           if [ -f Base64.txt ]; then
-            echo "Обработка Base64 источников из Base64.txt..."
-            while IFS= read -r base64_url || [ -n "$base64_url" ]; do
-              [[ -z "$base64_url" || "$base64_url" =~ ^[[:space:]]*# ]] && continue
-              base64_url=$(echo "$base64_url" | xargs)
-              b64_filename="b64_$(date +%s%N)_$RANDOM.tmp"
-              if curl -L -f --fail-early -s --user-agent "Mozilla/5.0" -o "./downloads/$b64_filename" "$base64_url"; then
-                base64 --decode "./downloads/$b64_filename" 2>/dev/null | grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt
-                echo "Base64 добавлен: $base64_url"
-              else
-                echo "Ошибка скачивания Base64: $base64_url" >&2
+            echo "Чтение Base64 из Base64.txt..."
+            while IFS= read -r b64_url || [ -n "$b64_url" ]; do
+              [[ -z "$b64_url" || "$b64_url" =~ ^[[:space:]]*# ]] && continue
+              b64_url=$(echo "$b64_url" | xargs)
+              tmp_b64="b64_$(date +%s%N).tmp"
+              if curl -L -f -s --user-agent "Mozilla/5.0" -o "./downloads/$tmp_b64" "$b64_url"; then
+                base64 --decode "./downloads/$tmp_b64" 2>/dev/null | grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt
+                echo "Декодировано: $b64_url"
               fi
             done < Base64.txt
           fi
 
-          # Финальная очистка: удаляем пустые строки и дубликаты (по желанию)
+          # Очистка от пустых строк и (опционально) дубликатов
           sed -i '/^$/d' mobile-whitelist-1.txt
-          # sort -u -o mobile-whitelist-1.txt mobile-whitelist-1.txt # Раскомментируй, если нужны только уникальные строки
+          sort -u -o mobile-whitelist-1.txt mobile-whitelist-1.txt
+          echo "Файл собран. Всего строк: $(wc -l < mobile-whitelist-1.txt)"
 
-      - name: Отправка на GitVerse
+      - name: Синхронизация с GitVerse
         run: |
-          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
+          # Клонируем целевой репозиторий
+          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./target_repo
           
-          # Копируем свежий файл в клон репозитория
-          cp -f mobile-whitelist-1.txt ./repo/mobile-whitelist-1.txt
+          # Копируем файл
+          cp -f mobile-whitelist-1.txt ./target_repo/mobile-whitelist-1.txt
           
-          # Добавляем метку времени
-          echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./repo/mobile-whitelist-1.txt
+          # Добавляем метку времени обновления прямо в файл
+          echo "# Updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./target_repo/mobile-whitelist-1.txt
 
-          cd ./repo
-          git config user.name "GitHub Action Bot"
-          git config user.email "action@noreply.github.com"
+          cd ./target_repo
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
           
           git add mobile-whitelist-1.txt
           
-          if git commit -m "auto update whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
+          if git commit -m "update whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
             git push
-            echo "✅ Файл успешно обновлен на GitVerse"
+            echo "✅ Данные отправлены на GitVerse"
           else
-            echo "Изменений не обнаружено."
+            echo "Изменений нет, пушить нечего."
           fi
