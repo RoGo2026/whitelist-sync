@@ -1,42 +1,16 @@
 #!/usr/bin/env python3
-import sys, os, socket, time, ssl, http.client, secrets, base64
+import sys, os, socket, time, ssl
 from urllib.parse import urlparse, parse_qs, unquote
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import base64
 
 # ───────── НАСТРОЙКИ ─────────
 INPUT = "mobile-whitelist-1.txt"
 OUTPUT = "working_whitelist.txt"
-MAX_WORKERS = 10
+MAX_WORKERS = 20
 TEST_TIMEOUT = 2
-MAX_LATENCY_MS = 2000
+MAX_LATENCY_MS = 500
 # ─────────────────────────────
-
-def dns_resolve_check(hostname):
-    """Проверка, резолвится ли домен в IP-адрес."""
-    try:
-        socket.gethostbyname(hostname)
-        return True
-    except:
-        return False
-
-def ws_handshake_check(hostname, port, timeout):
-    """Упрощенная проверка WebSocket Handshake через HTTP Upgrade."""
-    try:
-        ws_key = base64.b64encode(secrets.token_bytes(16)).decode('utf-8')
-        conn = http.client.HTTPConnection(hostname, port, timeout=timeout)
-        headers = {
-            "Upgrade": "websocket",
-            "Connection": "Upgrade",
-            "Sec-WebSocket-Key": ws_key,
-            "Sec-WebSocket-Version": "13"
-        }
-        conn.request("GET", "/", headers=headers)
-        response = conn.getresponse()
-        is_ws = response.status == 101
-        conn.close()
-        return is_ws
-    except:
-        return False
 
 def parse_link(link):
     try:
@@ -106,56 +80,41 @@ def tls_check(h, port, timeout):
     except:
         return False
 
-def test_proxy(link):
+def test_proxy(link, port):
     result = {"link": link, "ok": False, "latency": 0, "reason": ""}
     cfg, proto = parse_link(link)
     if not cfg:
         result["reason"] = "parse"
         return result
-
     try:
         if proto == "vless":
             h = cfg["settings"]["vnext"][0]["address"]
             p = cfg["settings"]["vnext"][0]["port"]
-            net_type = cfg["streamSettings"]["network"]
         else:
             h = cfg["settings"]["servers"][0]["address"]
             p = cfg["settings"]["servers"][0]["port"]
-            net_type = "tcp"
     except:
         result["reason"] = "extract"
         return result
-
-    # 1. DNS Проверка
-    if not h.replace('.', '').isdigit():
-        if not dns_resolve_check(h):
-            result["reason"] = "dns"
-            return result
     
-    # 2. TCP Проверка
+    # TCP проверка с таймаутом
     ok, lat = tcp_check(h, p, TEST_TIMEOUT)
     if not ok or lat is None:
         result["reason"] = "tcp"
         return result
     
+    # Проверка пинга
     if lat > MAX_LATENCY_MS:
         result["reason"] = "slow"
         result["latency"] = lat
         return result
     
     result["latency"] = lat
-
-    # 3. WebSocket Handshake (если указан тип ws)
-    if net_type == "ws" or "type=ws" in link:
-        if not ws_handshake_check(h, p, TEST_TIMEOUT):
-            result["reason"] = "ws_fail"
-            return result
     
-    # 4. TLS Проверка
-    if "security=tls" in link or "security=reality" in link or proto == "trojan":
-        if not tls_check(h, p, TEST_TIMEOUT):
-            result["reason"] = "tls"
-            return result
+    # TLS проверка с таймаутом
+    if not tls_check(h, p, TEST_TIMEOUT):
+        result["reason"] = "tls"
+        return result
     
     result["ok"] = True
     result["reason"] = "ok"
@@ -173,11 +132,11 @@ def main():
             print("No links")
             open(OUTPUT, "w").close()
             return
-
         print(f"Checking {len(links)} proxies...")
+        print(f"Settings: workers={MAX_WORKERS}, timeout={TEST_TIMEOUT}s, max_latency={MAX_LATENCY_MS}ms")
         working = []
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
-            futs = {ex.submit(test_proxy, ln): ln for ln in links}
+            futs = {ex.submit(test_proxy, ln, 12000 + i): ln for i, ln in enumerate(links)}
             for fut in as_completed(futs):
                 r = fut.result()
                 pv = r["link"][:45] + "..." if len(r["link"]) > 45 else r["link"]
@@ -186,7 +145,6 @@ def main():
                     print(f"OK ({r['latency']}ms): {pv}")
                 else:
                     print(f"FAIL: {pv} | {r['reason']}")
-
         working.sort(key=lambda x: x["latency"])
         with open(OUTPUT, "w", encoding="utf-8") as f:
             for it in working:
@@ -194,6 +152,8 @@ def main():
         print(f"\nDone. Working: {len(working)}/{len(links)}")
     except Exception as e:
         print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         if not os.path.exists(OUTPUT):
             open(OUTPUT, "w").close()
