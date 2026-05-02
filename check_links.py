@@ -7,8 +7,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 INPUT = "mobile-whitelist-1.txt"
 OUTPUT = "working_whitelist.txt"
 MAX_WORKERS = 10
-TEST_TIMEOUT = 1.5
-MAX_LATENCY_MS = 500
+TEST_TIMEOUT = 2
+MAX_LATENCY_MS = 2000
 # ─────────────────────────────
 
 def dns_resolve_check(hostname):
