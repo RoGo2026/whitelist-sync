@@ -33,6 +33,7 @@ vless://b6ce8a51-19b9-4979-91ba-b4298c26d5fc@5.188.140.166:993?security=reality&
 vless://c7c86a70-8f41-454a-9542-47e6f28a05cd@51.250.23.243:443?security=reality&encryption=none&pbk=XSyv5Fi_gW72GREh-PyGjfNfN4_Zyuuq6A-klKEU2Hc&headerType=&fp=chrome&type=tcp&flow=xtls-rprx-vision&sni=5post-gate.x5.ru#%F0%9F%87%B7%F0%9F%87%BA%20%D0%9D%D0%B5%D0%B9%D1%80%D0%BE%20-%20Lexa%20Vercel25
 vless://61e63959-c670-4c3b-ae77-86e8d4f58cf5@5.188.142.161:33010?security=reality&encryption=none&pbk=p9O3sL7aIIjEzPPY9fbCd4RNoof7HLUqsVMztZVmjz8&headerType=none&type=tcp&flow=xtls-rprx-vision&sni=max.ru#%F0%9F%87%BA%F0%9F%87%B8%20%D0%9D%D0%B5%D0%B9%D1%80%D0%BE%20-%20Lexa%20Vercel26
 vless://b6ce8a51-19b9-4979-91ba-b4298c26d5fc@5.188.140.166:993?security=reality&encryption=none&pbk=mAu8QDi3pbmMCFg9kKC-ZBIHdtnXeCuZt3VnAw6vlH4&headerType=&fp=qq&type=tcp&flow=xtls-rprx-vision&sni=max.ru&sid=ad7dab462a323acb#%F0%9F%87%B5%F0%9F%87%B1%20%D0%9D%D0%B5%D0%B9%D1%80%D0%BE%20-%20Lexa%20Vercel%2027
+vless://b6ce8a51-19b9-4979-91ba-b4298c26d5fc@109.120.191.171:443?mode=gun&security=tls&encryption=none&authority=&allowinsecure=0&type=grpc&serviceName=grpc-tunnel&sni=api-no-cache.dropmefile.net#%F0%9F%87%B5%F0%9F%87%B1%20%D0%9D%D0%B5%D0%B9%D1%80%D0%BE%20-%20Lexa%20Vercel%2028
 
 --TL--
 
