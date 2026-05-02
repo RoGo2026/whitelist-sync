@@ -1,4 +1,6 @@
-https://raw.githubusercontent.com/AirLinkVPN1/AirLinkVPN/refs/heads/main/rkn_white_list
+https://raw.githubusercontent.com/twempyasha/twempy-vpn/refs/heads/main/solarvpn.txt
+https://gitverse.ru/Catlerok_glasha/catwhiteMIRROR/content/master/configs.txt
+# https://raw.githubusercontent.com/AirLinkVPN1/AirLinkVPN/refs/heads/main/rkn_white_list
 # https://raw.githubusercontent.com/ShadowException/VPN/refs/heads/main/configs/VPN-cat-top-100
 # https://raw.githubusercontent.com/barry-far/V2ray-Config/refs/heads/main/Sub1.txt
 # https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt
