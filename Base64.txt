@@ -1,7 +1,7 @@
 https://gitflic.ru/project/sigil/my-new-cool-project/blob/raw?file=whitelist&branch=master
-https://mifa.world/fast
-https://mifa.world/turbo
 https://mifa.world/vless
+# https://mifa.world/fast
+# https://mifa.world/turbo
 # https://mifa.world/ss
 # https://mifa.world/trojan
 # https://mifa.world/hysteria
