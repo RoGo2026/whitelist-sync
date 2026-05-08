@@ -1,1 +1,7 @@
+vless://8aecaa61-dfde-476b-b83a-bb8c9fac922b@152.228.133.47:443?security=reality&type=tcp&flow=xtls-rprx-vision&sni=www.nvidia.com&fp=chrome&pbk=KlybaLW0-grtjEATyTVFIYoWIaoW-Duxi4lcM54_t2U&sid=#France Strasbourg
+vless://8aecaa61-dfde-476b-b83a-bb8c9fac922b@152.53.133.72:443?security=reality&type=tcp&flow=xtls-rprx-vision&sni=www.nvidia.com&fp=chrome&pbk=KlybaLW0-grtjEATyTVFIYoWIaoW-Duxi4lcM54_t2U&sid=#Germany Nuremberg
+vless://8aecaa61-dfde-476b-b83a-bb8c9fac922b@72.56.91.165:443?security=reality&type=tcp&flow=xtls-rprx-vision&sni=www.nvidia.com&fp=chrome&pbk=KlybaLW0-grtjEATyTVFIYoWIaoW-Duxi4lcM54_t2U&sid=#Netherlands Amsterdam
+vless://8aecaa61-dfde-476b-b83a-bb8c9fac922b@144.31.3.243:443?security=reality&type=tcp&flow=xtls-rprx-vision&sni=www.nvidia.com&fp=chrome&pbk=KlybaLW0-grtjEATyTVFIYoWIaoW-Duxi4lcM54_t2U&sid=#Poland Warsaw
+vless://8aecaa61-dfde-476b-b83a-bb8c9fac922b@85.192.49.203:443?security=reality&type=tcp&flow=xtls-rprx-vision&sni=www.nvidia.com&fp=chrome&pbk=KlybaLW0-grtjEATyTVFIYoWIaoW-Duxi4lcM54_t2U&sid=#Finland Helsinki
+vless://8aecaa61-dfde-476b-b83a-bb8c9fac922b@152.53.39.104:443?security=reality&type=tcp&flow=xtls-rprx-vision&sni=www.nvidia.com&fp=chrome&pbk=KlybaLW0-grtjEATyTVFIYoWIaoW-Duxi4lcM54_t2U&sid=#USA Manassas
 
