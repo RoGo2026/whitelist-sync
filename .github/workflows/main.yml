@@ -1,4 +1,4 @@
-name: Fetch UWB Configs → GitVerse (mobile-whitelist-1.txt)
+# name: Fetch UWB Configs → GitVerse (mobile-whitelist-1.txt)
 
 on:
   schedule:
