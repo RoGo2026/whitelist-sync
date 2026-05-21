@@ -1,5 +1,6 @@
 https://mifa.world/vless
 https://mifa.world/vmess
+https://mifa.world/other
 https://mifa.world/hysteria
 https://mifa.world/ss
 https://mifa.world/trojan
