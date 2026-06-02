@@ -7,9 +7,9 @@ import base64
 # ───────── НАСТРОЙКИ ─────────
 INPUT = "mobile-whitelist-1.txt"
 OUTPUT = "working_whitelist.txt"
-MAX_WORKERS = 20
-TEST_TIMEOUT = 2
-MAX_LATENCY_MS = 200
+MAX_WORKERS = 15
+TEST_TIMEOUT = 3
+MAX_LATENCY_MS = 1000
 # ─────────────────────────────
 
 def parse_link(link):
