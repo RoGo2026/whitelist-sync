@@ -1,11 +1,11 @@
 https://mifa.world/vless
 https://gitflic.ru/project/sigil/my-new-cool-project/blob/raw?file=whitelist&branch=master
-# https://mifa.world/vmess
-# https://mifa.world/other
-# https://mifa.world/hysteria
-# https://mifa.world/ss
-# https://mifa.world/trojan
-# https://raw.githubusercontent.com/acymz/AutoVPN/refs/heads/main/data/V2.txt
+https://mifa.world/vmess
+https://mifa.world/other
+https://mifa.world/hysteria
+https://mifa.world/ss
+https://mifa.world/trojan
+https://raw.githubusercontent.com/acymz/AutoVPN/refs/heads/main/data/V2.txt
 # https://raw.githubusercontent.com/ssrsub/ssr/refs/heads/master/v2ray
 
 
