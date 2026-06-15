@@ -1,11 +1,11 @@
 https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt
 https://raw.githubusercontent.com/zieng2/wl/refs/heads/main/vless_universal.txt
-# https://raw.githubusercontent.com/ksenkovsolo/HardVPN-bypass-WhiteLists-/refs/heads/main/vpn-lte/subscriptions/1sub.txt
+https://raw.githubusercontent.com/ksenkovsolo/HardVPN-bypass-WhiteLists-/refs/heads/main/vpn-lte/subscriptions/1sub.txt
+https://raw.githubusercontent.com/AirLinkVPN1/AirLinkVPN/refs/heads/main/rkn_white_list
 # https://raw.githubusercontent.com/barry-far/V2ray-Config/refs/heads/main/Sub1.txt
 # https://raw.githubusercontent.com/VP01596/vless-top15/refs/heads/main/AllNW.txt
 # https://raw.githubusercontent.com/V2RayRoot/V2RayConfig/refs/heads/main/Config/vless.txt
 # https://raw.githubusercontent.com/V2RayRoot/V2RayConfig/refs/heads/main/Config/shadowsocks.txt
-# https://raw.githubusercontent.com/AirLinkVPN1/AirLinkVPN/refs/heads/main/rkn_white_list
 # https://raw.githubusercontent.com/ShadowException/VPN/refs/heads/main/configs/VPN-cat-top-100
 # https://raw.githubusercontent.com/ewecrow78-gif/whitelist1/refs/heads/main/list.txt
 # https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist
