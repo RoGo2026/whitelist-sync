@@ -251,6 +251,7 @@ def main():
                     node_tags.append(outbound_obj["tag"])
 
             if singbox_outbounds:
+                # 1. Группа автовыбора (только логика переключения)
                 auto_switch_group = {
                     "type": "urltest",
                     "tag": "⚡ Автопереключение",
@@ -260,34 +261,50 @@ def main():
                     "tolerance": 50
                 }
 
+                # 2. ГЛАВНАЯ Группа ручного выбора (Selector), которая отобразится в интерфейсе Happ
+                # Первым пунктом в ней идет "Автопереключение", а дальше - весь список серверов
+                selector_group = {
+                    "type": "selector",
+                    "tag": "PROXY",
+                    "outbounds": ["⚡ Автопереключение"] + node_tags
+                }
+
                 singbox_config = {
+                    "log": {
+                        "level": "warn"
+                    },
                     "dns": {
                         "servers": [
-                            {"tag": "dns_proxy", "address": "https://1.1.1.1/dns-query"},
-                            {"tag": "dns_direct", "address": "8.8.8.8", "detour": "direct"}
+                            {"tag": "dns_proxy", "address": "8.8.8.8", "detour": "PROXY"},
+                            {"tag": "dns_direct", "address": "1.1.1.1", "detour": "direct"}
                         ],
                         "rules": [
-                            {"outbound": "any", "server": "dns_proxy"},
-                            {"clash_mode": "direct", "server": "dns_direct"}
+                            {"outbound": "any", "server": "dns_proxy"}
                         ]
                     },
                     "inbounds": [
                         {
                             "type": "tun",
+                            "tag": "tun-in",
                             "inet4_address": "172.19.0.1/30",
                             "auto_route": True,
                             "strict_route": True
                         }
                     ],
                     "outbounds": [
-                        auto_switch_group,
-                        *singbox_outbounds,
+                        selector_group,          # Главный интерфейс для Happ
+                        auto_switch_group,       # Логика автовыбора
+                        *singbox_outbounds,      # Сами серверы
                         {"type": "direct", "tag": "direct"},
-                        {"type": "block", "tag": "block"}
+                        {"type": "block", "tag": "block"},
+                        {"type": "dns", "tag": "dns-out"}
                     ],
                     "route": {
-                        "rules": [{"protocol": "dns", "outbound": "dns_proxy"}],
-                        "auto_detect_interface": True
+                        "rules": [
+                            {"protocol": "dns", "outbound": "dns-out"}
+                        ],
+                        "auto_detect_interface": True,
+                        "final": "PROXY"  # Весь трафик по умолчанию идет в ручной выбор
                     }
                 }
 
