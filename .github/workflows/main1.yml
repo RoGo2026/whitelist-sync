@@ -1,4 +1,4 @@
-name: Скачивать, проверять и обновлять mobile-whitelist-1.txt на GitVerse
+name: Скачивать, проверять и обновлять whitelist
 
 on:
   schedule:
@@ -88,6 +88,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Скачать собранный файл
         uses: actions/download-artifact@v4
@@ -102,40 +104,48 @@ jobs:
           sudo mv xray /usr/local/bin/
           echo "Xray-core установлен: $(xray version | head -n 1)"
 
-      - name: Запустить проверку ссылок через Xray-core
+      - name: Запустить проверку ссылок (создаст working_whitelist.txt и singbox.json)
         run: python3 check_links.py
 
-      - name: Обновить файлы на GitVerse (рабочие ссылки + JSON)
+      - name: Обновить текстовый файл на GitVerse
         run: |
-          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
+          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./gitverse-repo
 
-          # Копируем оба файла если они существуют
           if [ -f working_whitelist.txt ]; then
-            cp -f working_whitelist.txt ./repo/mobile-whitelist-1.txt
-            echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./repo/mobile-whitelist-1.txt
-            echo "✅ working_whitelist.txt скопирован"
+            cp -f working_whitelist.txt ./gitverse-repo/mobile-whitelist-1.txt
           else
-            cp -f mobile-whitelist-1.txt ./repo/mobile-whitelist-1.txt
-            echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./repo/mobile-whitelist-1.txt
+            cp -f mobile-whitelist-1.txt ./gitverse-repo/mobile-whitelist-1.txt
           fi
 
-          if [ -f singbox.json ]; then
-            cp -f singbox.json ./repo/singbox.json
-            echo "✅ singbox.json скопирован"
-          else
-            echo "⚠️ singbox.json не найден"
-          fi
+          echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./gitverse-repo/mobile-whitelist-1.txt
 
-          cd ./repo
+          cd ./gitverse-repo
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
-
-          # Добавляем оба файла в git
-          git add mobile-whitelist-1.txt singbox.json
+          git add mobile-whitelist-1.txt
 
           if git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
             git push
-            echo "✅ Файлы успешно отправлены на GitVerse"
+            echo "✅ Текстовый файл отправлен на GitVerse"
           else
-            echo "Нет изменений после проверки"
+            echo "ℹ️ Нет изменений для GitVerse"
+          fi
+
+      - name: Обновить JSON файл на GitHub
+        run: |
+          if [ -f singbox.json ]; then
+            cp -f singbox.json ./singbox.json
+            
+            git config user.name "GitHub Action Bot"
+            git config user.email "action@noreply.github.com"
+            git add singbox.json
+            
+            if git commit -m "Update singbox.json $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
+              git push
+              echo "✅ singbox.json обновлен на GitHub"
+            else
+              echo "ℹ️ Нет изменений для JSON"
+            fi
+          else
+            echo "⚠️ singbox.json не найден, проверка не прошла"
           fi
