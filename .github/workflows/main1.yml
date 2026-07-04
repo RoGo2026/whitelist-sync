@@ -22,6 +22,7 @@ jobs:
           mkdir -p ./downloads
           > mobile-whitelist-1.txt
 
+          # 1. Обработка обычных ссылок из sources.txt
           if [ -f sources.txt ]; then
             echo "Обработка источников из sources.txt..."
             while IFS= read -r url || [ -n "$url" ]; do
@@ -41,12 +42,16 @@ jobs:
             done < sources.txt
           fi
 
+          # 2. Добавление готовых ключей из локального файла VPN-Vless.txt
           if [ -f VPN-Vless.txt ]; then
             echo "Добавление готовых ключей из VPN-Vless.txt..."
             grep -v '^[[:space:]]*#' VPN-Vless.txt | sed '/^$/d' >> mobile-whitelist-1.txt
             echo "Локальные ключи из VPN-Vless.txt добавлены."
+          else
+            echo "Файл VPN-Vless.txt не найден, пропускаем."
           fi
 
+          # 3. Декодирование Base64 из списка URL в Base64.txt
           if [ -f Base64.txt ]; then
             echo "Обработка Base64 источников из Base64.txt..."
             while IFS= read -r base64_url || [ -n "$base64_url" ]; do
@@ -57,13 +62,16 @@ jobs:
                 echo "Скачивание Base64: $base64_url"
                 if curl -L -f --fail-early --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -o "./downloads/$b64_filename" "$base64_url"; then
                   base64 --decode "./downloads/$b64_filename" 2>/dev/null | grep -v '^[[:space:]]*#' | sed '/^$/d' >> mobile-whitelist-1.txt
-                  echo "Base64 успешно декодирован"
+                  echo "Base64 успешно декодирован: $base64_url"
+                else
+                  echo "Ошибка скачивания Base64: $base64_url" >&2
                 fi
                 rm -f "./downloads/$b64_filename"
               fi
             done < Base64.txt
           fi
 
+          # Финальная очистка итогового файла
           sed -i '/^$/d' mobile-whitelist-1.txt
 
       - name: Сохранить собранный файл для проверки
@@ -86,13 +94,22 @@ jobs:
         with:
           name: raw-whitelist
 
-      - name: Запустить проверку ссылок
+      - name: Скачать и установить Xray-core
+        run: |
+          wget -q https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip -O xray.zip
+          unzip -q xray.zip
+          chmod +x xray
+          sudo mv xray /usr/local/bin/
+          echo "Xray-core установлен: $(xray version | head -n 1)"
+
+      - name: Запустить проверку ссылок через Xray-core
         run: python3 check_links.py
 
       - name: Обновить файл на GitVerse (только рабочие ссылки)
         run: |
           git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
 
+          # Если скрипт проверки выдал результат, берем его, иначе берем общий список
           if [ -f working_whitelist.txt ]; then
             cp -f working_whitelist.txt ./repo/mobile-whitelist-1.txt
           else
@@ -109,7 +126,7 @@ jobs:
 
           if git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
             git push
-            echo "✅ Файл успешно отправлен на GitVerse"
+            echo "✅ Файл с проверенными ссылками успешно отправлен на GitVerse"
           else
-            echo "Нет изменений"
+            echo "Нет изменений после проверки"
           fi
