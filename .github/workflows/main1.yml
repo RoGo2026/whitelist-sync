@@ -9,6 +9,9 @@ concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   collect-sources:
     runs-on: ubuntu-latest
@@ -88,8 +91,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Скачать собранный файл
         uses: actions/download-artifact@v4
@@ -145,5 +146,5 @@ jobs:
               echo "ℹ️ Нет изменений для JSON"
             fi
           else
-            echo "⚠️ singbox.json не найден, проверка не прошла"
+            echo "️ singbox.json не найден, проверка не прошла"
           fi
