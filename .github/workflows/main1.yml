@@ -1,4 +1,4 @@
-name: Скачивать, проверять и обновлять whitelist
+name: Скачивать, проверять и обновлять mobile-whitelist-1.txt на GitVerse
 
 on:
   schedule:
@@ -8,9 +8,6 @@ on:
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
-
-permissions:
-  contents: write
 
 jobs:
   collect-sources:
@@ -105,46 +102,31 @@ jobs:
           sudo mv xray /usr/local/bin/
           echo "Xray-core установлен: $(xray version | head -n 1)"
 
-      - name: Запустить проверку ссылок (создаст working_whitelist.txt и singbox.json)
+      - name: Запустить проверку ссылок через Xray-core
         run: python3 check_links.py
 
-      - name: Обновить текстовый файл на GitVerse
+      - name: Обновить файл на GitVerse (только рабочие ссылки)
         run: |
-          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./gitverse-repo
+          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
 
+          # Если скрипт проверки выдал результат, берем его, иначе берем общий список
           if [ -f working_whitelist.txt ]; then
-            cp -f working_whitelist.txt ./gitverse-repo/mobile-whitelist-1.txt
+            cp -f working_whitelist.txt ./repo/mobile-whitelist-1.txt
           else
-            cp -f mobile-whitelist-1.txt ./gitverse-repo/mobile-whitelist-1.txt
+            cp -f mobile-whitelist-1.txt ./repo/mobile-whitelist-1.txt
           fi
 
-          echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./gitverse-repo/mobile-whitelist-1.txt
+          echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./repo/mobile-whitelist-1.txt
 
-          cd ./gitverse-repo
+          cd ./repo
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
+
           git add mobile-whitelist-1.txt
 
           if git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
             git push
-            echo "✅ Текстовый файл отправлен на GitVerse"
+            echo "✅ Файл с проверенными ссылками успешно отправлен на GitVerse"
           else
-            echo "ℹ️ Нет изменений для GitVerse"
-          fi
-
-      - name: Обновить JSON файл на GitHub
-        run: |
-          if [ -f singbox.json ]; then
-            git config user.name "GitHub Action Bot"
-            git config user.email "action@noreply.github.com"
-            git add singbox.json
-            
-            if git commit -m "Update singbox.json $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
-              git push
-              echo "✅ singbox.json обновлен на GitHub"
-            else
-              echo "ℹ️ Нет изменений для JSON"
-            fi
-          else
-            echo "️ singbox.json не найден, проверка не прошла"
+            echo "Нет изменений после проверки"
           fi
