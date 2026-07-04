@@ -116,17 +116,26 @@ jobs:
             cp -f mobile-whitelist-1.txt ./repo/mobile-whitelist-1.txt
           fi
 
+          # КОПИРУЕМ НОВЫЙ JSON КОНФИГ ДЛЯ HAPP В РЕПОЗИТОРИЙ GITVERSE
+          if [ -f singbox_config.json ]; then
+            cp -f singbox_config.json ./repo/singbox_config.json
+          fi
+
           echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./repo/mobile-whitelist-1.txt
 
           cd ./repo
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
 
+          # Добавляем оба файла: txt и json
           git add mobile-whitelist-1.txt
+          if [ -f singbox_config.json ]; then
+            git add singbox_config.json
+          fi
 
-          if git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
+          if git commit -m "auto update checked whitelist and smart config $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
             git push
-            echo "✅ Файл с проверенными ссылками успешно отправлен на GitVerse"
+            echo "✅ Файлы успешно отправлены на GitVerse"
           else
             echo "Нет изменений после проверки"
           fi
