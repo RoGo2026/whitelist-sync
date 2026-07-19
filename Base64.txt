@@ -1,5 +1,5 @@
-https://mifa.world/vless
-https://gitflic.ru/project/sigil/my-new-cool-project/blob/raw?file=whitelist&branch=master
+# https://mifa.world/vless
+# https://gitflic.ru/project/sigil/my-new-cool-project/blob/raw?file=whitelist&branch=master
 # https://mifa.world/vmess
 # https://mifa.world/other
 # https://mifa.world/hysteria
