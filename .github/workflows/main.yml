@@ -128,3 +128,58 @@ jobs:
           else
             echo "Нет изменений после проверки"
           fi
+
+  test-and-filter-retry:
+    needs: test-and-filter
+    if: ${{ failure() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Повторный запуск test-and-filter (вторая попытка)
+        run: echo "test-and-filter завершился ошибкой, запускаю повторную попытку"
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Скачать собранный файл
+        uses: actions/download-artifact@v4
+        with:
+          name: raw-whitelist
+
+      - name: Скачать и установить Xray-core
+        run: |
+          wget -q https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip -O xray.zip
+          unzip -q xray.zip
+          chmod +x xray
+          sudo mv xray /usr/local/bin/
+          echo "Xray-core установлен: $(xray version | head -n 1)"
+
+      - name: Запустить проверку ссылок через Xray-core
+        run: python3 check_links.py
+
+      - name: Обновить файл на GitVerse (только рабочие ссылки)
+        run: |
+          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
+
+          # Если скрипт проверки выдал результат, берем его, иначе берем общий список
+          if [ -f working_whitelist.txt ]; then
+            cp -f working_whitelist.txt ./repo/mobile-whitelist-1.txt
+          else
+            cp -f mobile-whitelist-1.txt ./repo/mobile-whitelist-1.txt
+          fi
+
+          echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./repo/mobile-whitelist-1.txt
+
+          cd ./repo
+          git config user.name "GitHub Action Bot"
+          git config user.email "action@noreply.github.com"
+
+          git add mobile-whitelist-1.txt
+
+          if git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
+            git push
+            echo "✅ Файл с проверенными ссылками успешно отправлен на GitVerse"
+          else
+            echo "Нет изменений после проверки"
+          fi
