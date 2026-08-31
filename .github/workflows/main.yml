@@ -148,6 +148,8 @@ jobs:
     steps:
       - name: Перезапустить workflow (одна повторная попытка)
         run: |
+          echo "Ожидание 60 секунд перед повторным запуском..."
+          sleep 60
           curl -sS -X POST \
             "https://api.github.com/repos/${{ github.repository }}/actions/workflows/main.yml/dispatches" \
             -H "Authorization: Bearer ${{ github.token }}" \
