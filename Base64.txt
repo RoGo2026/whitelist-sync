@@ -1,4 +1,5 @@
 https://raw.githubusercontent.com/Pawdroid/Free-servers/refs/heads/main/sub
+https://raw.githubusercontent.com/Pawdroid/Free-servers/refs/heads/main/static/sub_en
 # https://gitflic.ru/project/sigil/my-new-cool-project/blob/raw?file=whitelist&branch=master
 # https://raw.githubusercontent.com/acymz/AutoVPN/refs/heads/main/data/V2.txt
 # https://raw.githubusercontent.com/ssrsub/ssr/refs/heads/master/v2ray
