@@ -3,59 +3,10 @@ https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main
 https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-SNI-RU-all.txt
 https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt
 https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-CIDR-RU-all.txt
+https://raw.githubusercontent.com/SoliSpirit/SolVPN/refs/heads/main/all_configs.txt
 # https://raw.githubusercontent.com/ewecrow78-gif/whitelist1/refs/heads/main/list.txt
 # https://raw.githubusercontent.com/ksenkovsolo/HardVPN-bypass-WhiteLists-/refs/heads/main/vpn-lte/subscriptions/1sub.txt
 # https://raw.githubusercontent.com/ShadowException/VPN/refs/heads/main/configs/VPN-cat-top-100
 # https://raw.githubusercontent.com/AirLinkVPN1/AirLinkVPN/refs/heads/main/rkn_white_list
-# https://raw.githubusercontent.com/btsk161/Freeinternet_byMygalaru.github.io/refs/heads/main/premium.txt
-# https://raw.githubusercontent.com/prominbro/sub/refs/heads/main/212.txt
-# https://raw.githubusercontent.com/VP01596/vless-top15/refs/heads/main/AllNW.txt
-# https://raw.githubusercontent.com/barry-far/V2ray-Config/refs/heads/main/Sub1.txt
-# https://raw.githubusercontent.com/barry-far/V2ray-Config/refs/heads/main/Sub2.txt
-# https://raw.githubusercontent.com/ShadowException/VPN/refs/heads/main/configs/VPN-cat
-# https://raw.githubusercontent.com/SoliSpirit/SolVPN/refs/heads/main/all_configs.txt
-# https://raw.githubusercontent.com/mmaksim9191/my-vpn-configs/main/configs/mobile-whitelist-1.txt
-# https://raw.githubusercontent.com/FLEXIY0/matryoshka-vpn/refs/heads/main/configs/russia_whitelist.txt
-# https://raw.githubusercontent.com/ksenkovsolo/HardVPN-bypass-WhiteLists-/refs/heads/main/vpn-lte/WHITELIST-ALL.txt
-# https://raw.githubusercontent.com/V2RayRoot/V2RayConfig/refs/heads/main/Config/vless.txt
-# https://raw.githubusercontent.com/V2RayRoot/V2RayConfig/refs/heads/main/Config/shadowsocks.txt
-# https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/14.txt
-# https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/12.txt
-# https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/2.txt
-# https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/1.txt
-# https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/15.txt
-# https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/19.txt
-# https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/20.txt
-# https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/21.txt
-# https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/23.txt
-# https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/24.txt
-# https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/25.txt
-# https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/26.txt
-# https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/3.txt
-# https://raw.githubusercontent.com/AvenCores/goida-vpn-configs/main/githubmirror/6.txt
-# https://raw.githubusercontent.com/EtoNeYaProject/etoneyaproject.github.io/refs/heads/main/whitelist
-# https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/Canada.txt
-# https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/Finland.txt
-# https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/France.txt
-# https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/Germany.txt
-# https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/Hong%20Kong.txt
-# https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/Iran.txt
-# https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/Russia.txt
-# https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/Spain.txt
-# https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/The%20Netherlands.txt
-# https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/United%20Kingdom.txt
-# https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/United%20States.txt
-# https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/Unknown.txt
-# https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/grpc.txt
-# https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/httpupgrade.txt
-# https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/ss.txt
-# https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/tcp.txt
-# https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/main/category/trojan.txt
-# https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-SNI-RU-all.txt
-# https://raw.githubusercontent.com/LalatinaHub/Mineral/refs/heads/master/result/nodes
-# https://raw.githubusercontent.com/Argh94/Proxy-List/main/All_Config.txt
-# https://raw.githubusercontent.com/Argh94/Proxy-List/refs/heads/main/Hysteria2.txt
-# https://raw.githubusercontent.com/Argh94/Proxy-List/main/ShadowSocks.txt
-# https://raw.githubusercontent.com/Argh94/Proxy-List/main/Trojan.txt
-# https://raw.githubusercontent.com/MhdiTaheri/V2rayCollector_Py/refs/heads/main/sub/Mix/mix.txt
+
 
