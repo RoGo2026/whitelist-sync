@@ -14,7 +14,7 @@ permissions:
   actions: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.retry }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout GitHub repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Сбор всех источников (URL, Локальные файлы, Base64)
         run: |
@@ -83,7 +83,7 @@ jobs:
           sed -i '/^$/d' mobile-whitelist-1.txt
 
       - name: Сохранить собранный файл для проверки
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: raw-whitelist
           path: mobile-whitelist-1.txt
@@ -95,10 +95,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Скачать собранный файл
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: raw-whitelist
 
@@ -133,6 +133,12 @@ jobs:
           git add mobile-whitelist-1.txt
 
           if git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
+            for i in 1 2 3 4 5; do
+              if git pull --rebase -X theirs origin master; then
+                break
+              fi
+              sleep 5
+            done
             git push
             echo "✅ Файл с проверенными ссылками успешно отправлен на GitVerse"
           else
