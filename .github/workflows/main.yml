@@ -114,48 +114,8 @@ jobs:
         run: python3 check_links.py
 
       - name: Обновить файл на GitVerse (только рабочие ссылки)
-        env:
-          GITVERSE_SSH_KEY: ${{ secrets.GITVERSE_SSH_KEY }}
         run: |
-          REPO_PATH="RoGo/mobile-whitelist"
-          TOKEN="${{ secrets.WHITELIST_TOKEN }}"
-          IP=$(getent ahostsv4 gitverse.ru | awk 'NR==1{print $1}')
-          GIT_Q="-c http.version=HTTP/1.1 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30"
-          ok=0
-
-          if GIT_TERMINAL_PROMPT=0 timeout 120 git $GIT_Q clone --depth 1 "https://RoGo:$TOKEN@gitverse.ru/$REPO_PATH.git" ./repo; then
-            ok=1
-          else
-            rm -rf ./repo
-          fi
-
-          if [ $ok -eq 0 ] && [ -n "$IP" ]; then
-            echo "HTTPS по имени не сработал, пробуем напрямую по IP $IP"
-            if GIT_TERMINAL_PROMPT=0 timeout 120 git $GIT_Q -c http.sslVerify=false -c "http.extraHeader=Host: gitverse.ru" clone --depth 1 "https://RoGo:$TOKEN@$IP/$REPO_PATH.git" ./repo; then
-              ok=1
-            else
-              rm -rf ./repo
-            fi
-          fi
-
-          if [ $ok -eq 0 ] && [ -n "$GITVERSE_SSH_KEY" ]; then
-            echo "Пробуем SSH по ключу"
-            mkdir -p ~/.ssh
-            printf '%s\n' "$GITVERSE_SSH_KEY" > ~/.ssh/id_ed25519
-            chmod 700 ~/.ssh
-            chmod 600 ~/.ssh/id_ed25519
-            ssh-keyscan -T 15 gitverse.ru >> ~/.ssh/known_hosts 2>/dev/null || true
-            if GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=20" timeout 120 git clone --depth 1 "git@gitverse.ru:$REPO_PATH.git" ./repo; then
-              ok=1
-            else
-              rm -rf ./repo
-            fi
-          fi
-
-          if [ $ok -eq 0 ]; then
-            echo "::error::GitVerse недоступен с раннера: не сработали ни HTTPS, ни HTTPS по IP, ни SSH"
-            exit 1
-          fi
+          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo
 
           # Если скрипт проверки выдал результат, берем его, иначе берем общий список
           if [ -f working_whitelist.txt ]; then
