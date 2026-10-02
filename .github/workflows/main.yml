@@ -114,40 +114,46 @@ jobs:
         run: python3 check_links.py
 
       - name: Обновить файл на GitVerse (только рабочие ссылки)
+        env:
+          GITVERSE_SSH_KEY: ${{ secrets.GITVERSE_SSH_KEY }}
         run: |
-          echo "== Диагностика сети до GitVerse =="
-          echo "runner IP: $(curl -sS --max-time 10 https://api.ipify.org || echo '?')"
-          echo "-- DNS --"
-          getent hosts gitverse.ru || echo "DNS не резолвится"
-          echo "-- TCP-порты --"
-          for port in 443 22; do
-            if timeout 15 bash -c "cat < /dev/null > /dev/tcp/gitverse.ru/$port" 2>/dev/null; then
-              echo "TCP $port: ДОСТУПЕН"
-            else
-              echo "TCP $port: НЕДОСТУПЕН"
-            fi
-          done
-          echo "-- HTTPS через curl --"
-          if curl -4 -sS -o /dev/null -w "https: code=%{http_code} connect=%{time_connect}s tls=%{time_appconnect}s total=%{time_total}s\n" --max-time 25 https://gitverse.ru/; then
-            echo "curl https: ОТВЕТИЛ"
+          REPO_PATH="RoGo/mobile-whitelist"
+          TOKEN="${{ secrets.WHITELIST_TOKEN }}"
+          IP=$(getent ahostsv4 gitverse.ru | awk 'NR==1{print $1}')
+          GIT_Q="-c http.version=HTTP/1.1 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30"
+          ok=0
+
+          if GIT_TERMINAL_PROMPT=0 timeout 120 git $GIT_Q clone --depth 1 "https://RoGo:$TOKEN@gitverse.ru/$REPO_PATH.git" ./repo; then
+            ok=1
           else
-            echo "curl https: НЕ ОТВЕТИЛ"
-          fi
-          echo "-- SSH --"
-          timeout 15 ssh-keyscan -T 10 -p 22 gitverse.ru 2>&1 | head -n 3 || echo "ssh-keyscan не ответил"
-          echo "== Конец диагностики =="
-
-          for i in 1 2 3; do
             rm -rf ./repo
-            if GIT_TERMINAL_PROMPT=0 git -c http.version=HTTP/1.1 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=45 clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo; then
-              break
-            fi
-            echo "Клон не удался (попытка $i)"
-            sleep 15
-          done
+          fi
 
-          if [ ! -d ./repo/.git ]; then
-            echo "::error::Не удалось склонировать репозиторий GitVerse после 5 попыток"
+          if [ $ok -eq 0 ] && [ -n "$IP" ]; then
+            echo "HTTPS по имени не сработал, пробуем напрямую по IP $IP"
+            if GIT_TERMINAL_PROMPT=0 timeout 120 git $GIT_Q -c http.sslVerify=false -c "http.extraHeader=Host: gitverse.ru" clone --depth 1 "https://RoGo:$TOKEN@$IP/$REPO_PATH.git" ./repo; then
+              ok=1
+            else
+              rm -rf ./repo
+            fi
+          fi
+
+          if [ $ok -eq 0 ] && [ -n "$GITVERSE_SSH_KEY" ]; then
+            echo "Пробуем SSH по ключу"
+            mkdir -p ~/.ssh
+            printf '%s\n' "$GITVERSE_SSH_KEY" > ~/.ssh/id_ed25519
+            chmod 700 ~/.ssh
+            chmod 600 ~/.ssh/id_ed25519
+            ssh-keyscan -T 15 gitverse.ru >> ~/.ssh/known_hosts 2>/dev/null || true
+            if GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=20" timeout 120 git clone --depth 1 "git@gitverse.ru:$REPO_PATH.git" ./repo; then
+              ok=1
+            else
+              rm -rf ./repo
+            fi
+          fi
+
+          if [ $ok -eq 0 ]; then
+            echo "::error::GitVerse недоступен с раннера: не сработали ни HTTPS, ни HTTPS по IP, ни SSH"
             exit 1
           fi
 
