@@ -129,7 +129,21 @@ jobs:
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
           git add checked/mobile-whitelist-1.txt
-          git commit -m "checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')" || echo "Нет изменений"
+          if git diff --cached --quiet; then
+            echo "Нет изменений"
+            exit 0
+          fi
+          git commit -m "checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          for i in 1 2 3; do
+            if git push origin HEAD:main; then
+              echo "OK: проверенный файл зафиксирован в репозитории GitHub"
+              exit 0
+            fi
+            git pull --rebase origin main
+            sleep 5
+          done
+          echo "::error::Не удалось отправить проверенный файл в GitHub"
+          exit 1
 
       - name: Обновить файл на GitVerse (если GitVerse доступен с раннера)
         continue-on-error: true
