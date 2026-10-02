@@ -10,7 +10,7 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
   actions: write
 
 concurrency:
@@ -113,60 +113,48 @@ jobs:
       - name: Запустить проверку ссылок через Xray-core
         run: python3 check_links.py
 
-      - name: Сохранить проверенный файл в репозитории GitHub
+      - name: Обновить файл на GitVerse (только рабочие ссылки)
         run: |
-          mkdir -p checked
-          if [ -f working_whitelist.txt ]; then
-            cp -f working_whitelist.txt checked/mobile-whitelist-1.txt
-          else
-            cp -f mobile-whitelist-1.txt checked/mobile-whitelist-1.txt
-          fi
-          echo "# Last checked: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> checked/mobile-whitelist-1.txt
-          echo "Строк в проверенном файле: $(grep -cv '^[[:space:]]*$\|^#' checked/mobile-whitelist-1.txt)"
-
-      - name: Зафиксировать проверенный файл в GitHub
-        run: |
-          git config user.name "GitHub Action Bot"
-          git config user.email "action@noreply.github.com"
-          git add checked/mobile-whitelist-1.txt
-          if git diff --cached --quiet; then
-            echo "Нет изменений"
-            exit 0
-          fi
-          git commit -m "checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-          for i in 1 2 3; do
-            if git push origin HEAD:main; then
-              echo "OK: проверенный файл зафиксирован в репозитории GitHub"
-              exit 0
+          for i in 1 2 3 4 5; do
+            rm -rf ./repo
+            if git -c http.version=HTTP/1.1 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo; then
+              break
             fi
-            git pull --rebase origin main
-            sleep 5
+            echo "Клон GitVerse не удался (попытка $i), диагностика сети:"
+            curl -4 -sS -o /dev/null -w "HTTP=%{http_code} connect=%{time_connect}s total=%{time_total}s\n" --max-time 20 https://gitverse.ru/ || echo "curl: GitVerse не отвечает"
+            getent hosts gitverse.ru || echo "DNS не резолвится"
+            sleep 30
           done
-          echo "::error::Не удалось отправить проверенный файл в GitHub"
-          exit 1
 
-      - name: Обновить файл на GitVerse (если GitVerse доступен с раннера)
-        continue-on-error: true
-        run: |
-          if ! curl -sS --max-time 15 -o /dev/null "https://gitverse.ru/"; then
-            echo "::notice title=GitVerse недоступен::Раннер GitHub Actions не может достучаться до gitverse.ru (сетевой таймаут). Синхронизацию выполняет локальный скрипт на ПК."
-            exit 0
+          if [ ! -d ./repo/.git ]; then
+            echo "::error::Не удалось склонировать репозиторий GitVerse после 5 попыток"
+            exit 1
           fi
 
-          rm -rf ./repo
-          git clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo || exit 0
-          cp -f checked/mobile-whitelist-1.txt ./repo/mobile-whitelist-1.txt
+          # Если скрипт проверки выдал результат, берем его, иначе берем общий список
+          if [ -f working_whitelist.txt ]; then
+            cp -f working_whitelist.txt ./repo/mobile-whitelist-1.txt
+          else
+            cp -f mobile-whitelist-1.txt ./repo/mobile-whitelist-1.txt
+          fi
+
+          echo "# Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ./repo/mobile-whitelist-1.txt
 
           cd ./repo
           git config user.name "GitHub Action Bot"
           git config user.email "action@noreply.github.com"
+
           git add mobile-whitelist-1.txt
+
           if git commit -m "auto update checked whitelist $(date -u +'%Y-%m-%d %H:%M:%S UTC')"; then
-            for i in 1 2 3; do
-              if git pull --rebase -X theirs origin master; then break; fi
+            for i in 1 2 3 4 5; do
+              if git pull --rebase -X theirs origin master; then
+                break
+              fi
               sleep 5
             done
-            git push && echo "✅ Файл отправлен на GitVerse"
+            git push
+            echo "✅ Файл с проверенными ссылками успешно отправлен на GitVerse"
           else
             echo "Нет изменений после проверки"
           fi
