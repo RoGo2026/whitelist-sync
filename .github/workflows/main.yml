@@ -115,15 +115,35 @@ jobs:
 
       - name: Обновить файл на GitVerse (только рабочие ссылки)
         run: |
-          for i in 1 2 3 4 5; do
+          echo "== Диагностика сети до GitVerse =="
+          echo "runner IP: $(curl -sS --max-time 10 https://api.ipify.org || echo '?')"
+          echo "-- DNS --"
+          getent hosts gitverse.ru || echo "DNS не резолвится"
+          echo "-- TCP-порты --"
+          for port in 443 22; do
+            if timeout 15 bash -c "cat < /dev/null > /dev/tcp/gitverse.ru/$port" 2>/dev/null; then
+              echo "TCP $port: ДОСТУПЕН"
+            else
+              echo "TCP $port: НЕДОСТУПЕН"
+            fi
+          done
+          echo "-- HTTPS через curl --"
+          if curl -4 -sS -o /dev/null -w "https: code=%{http_code} connect=%{time_connect}s tls=%{time_appconnect}s total=%{time_total}s\n" --max-time 25 https://gitverse.ru/; then
+            echo "curl https: ОТВЕТИЛ"
+          else
+            echo "curl https: НЕ ОТВЕТИЛ"
+          fi
+          echo "-- SSH --"
+          timeout 15 ssh-keyscan -T 10 -p 22 gitverse.ru 2>&1 | head -n 3 || echo "ssh-keyscan не ответил"
+          echo "== Конец диагностики =="
+
+          for i in 1 2 3; do
             rm -rf ./repo
-            if git -c http.version=HTTP/1.1 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo; then
+            if GIT_TERMINAL_PROMPT=0 git -c http.version=HTTP/1.1 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=45 clone https://RoGo:${{ secrets.WHITELIST_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git ./repo; then
               break
             fi
-            echo "Клон GitVerse не удался (попытка $i), диагностика сети:"
-            curl -4 -sS -o /dev/null -w "HTTP=%{http_code} connect=%{time_connect}s total=%{time_total}s\n" --max-time 20 https://gitverse.ru/ || echo "curl: GitVerse не отвечает"
-            getent hosts gitverse.ru || echo "DNS не резолвится"
-            sleep 30
+            echo "Клон не удался (попытка $i)"
+            sleep 15
           done
 
           if [ ! -d ./repo/.git ]; then
