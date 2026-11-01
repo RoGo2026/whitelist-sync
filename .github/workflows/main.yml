@@ -172,7 +172,9 @@ jobs:
           fi
 
       # РЕЗЕРВ: GitVerse (на случай, если Мос.Хаб недоступен)
+      # ВРЕМЕННО ОТКЛЮЧЕНО: GitVerse недоступен (клонирование не удаётся). Только Мос.Хаб.
       - name: Обновить файл на GitVerse (резерв, только рабочие ссылки)
+        if: false
         continue-on-error: true
         run: |
           CLONE_URL="https://RoGo:${{ secrets.GITVERSE_TOKEN }}@gitverse.ru/RoGo/mobile-whitelist.git"
