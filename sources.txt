@@ -10,3 +10,7 @@ https://raw.githubusercontent.com/FLAT447/v2ray-lists/refs/heads/main/WHITE_FULL
 https://raw.githubusercontent.com/luxxuria/harvester/refs/heads/main/top_600.txt
 https://raw.githubusercontent.com/hiztin/VLESS-PO-GRIBI/refs/heads/main/deploy/subscriptions/10.txt
 https://raw.githubusercontent.com/hiztin/VLESS-PO-GRIBI/refs/heads/main/deploy/subscriptions/11.txt
+https://raw.githubusercontent.com/flaafix/AetrisVPN/refs/heads/main/AetrisVPN.txt
+
+
+
