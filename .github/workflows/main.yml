@@ -115,24 +115,45 @@ jobs:
 
       # ОСНОВНОЙ получатель: Мос.Хаб (hub.mos.ru) — гит-платформа на домене mos.ru
       - name: Обновить файл на Мос.Хаб (только рабочие ссылки)
-        continue-on-error: true
+        env:
+          WHITELIST_TOKEN: ${{ secrets.WHITELIST_TOKEN }}
         run: |
-          CLONE_URL="https://oauth2:${{ secrets.WHITELIST_TOKEN }}@hub.mos.ru/84304/whitelist.git"
+          CLONE_URL="https://oauth2:${WHITELIST_TOKEN}@hub.mos.ru/84304/whitelist.git"
+
+          # Диагностика доступа: печатает HTTP-код и тело ответа, сам токен не выводится
+          probe_mh() {
+            echo "== Диагностика Мос.Хаб =="
+            for cred in "oauth2:${WHITELIST_TOKEN}" "oauth2:dummy_invalid_token"; do
+              code=$(curl -sS -o /tmp/mh_body.txt -w '%{http_code}' -u "$cred" \
+                "https://hub.mos.ru/84304/whitelist.git/info/refs?service=git-upload-pack" || echo "000")
+              echo "логин ${cred%%:*}: HTTP $code"
+              head -c 300 /tmp/mh_body.txt 2>/dev/null || true
+              echo
+            done
+            echo "401 = токен недействителен; 403 и у реального, и у фиктивного = блокировка по IP/User-Agent"
+          }
 
           # Клонирование с повторами: Mos.Hub периодически отвечает 502
           ok=0
           for i in $(seq 1 8); do
             echo "Клонирование Мос.Хаб, попытка $i..."
             rm -rf ./repo-mh
-            if git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 clone "$CLONE_URL" ./repo-mh; then
+            if err=$(git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 clone "$CLONE_URL" ./repo-mh 2>&1); then
               ok=1
               break
+            fi
+            echo "$err"
+            if echo "$err" | grep -qE 'error: (401|403)'; then
+              echo "ОШИБКА: Мос.Хаб отклонил доступ (401/403), повторять бессмысленно"
+              probe_mh
+              exit 1
             fi
             echo "Мос.Хаб не ответил (502/таймаут), повтор через $((i*10)) сек..."
             sleep $((i*10))
           done
           if [ "$ok" != "1" ]; then
             echo "ОШИБКА: не удалось клонировать Мос.Хаб после 8 попыток"
+            probe_mh
             exit 1
           fi
 
@@ -164,6 +185,7 @@ jobs:
             done
             if [ "$pushed" != "1" ]; then
               echo "ОШИБКА: не удалось отправить файл на Мос.Хаб после 8 попыток"
+              probe_mh
               exit 1
             fi
             echo "✅ Файл с проверенными ссылками успешно отправлен на Мос.Хаб"
