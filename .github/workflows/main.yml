@@ -117,12 +117,29 @@ jobs:
       - name: Обновить файл на Мос.Хаб (только рабочие ссылки)
         env:
           WHITELIST_TOKEN: ${{ secrets.WHITELIST_TOKEN }}
+          MOSHUB_SSH_KEY: ${{ secrets.MOSHUB_SSH_KEY }}
         run: |
-          CLONE_URL="https://oauth2:${WHITELIST_TOKEN}@hub.mos.ru/84304/whitelist.git"
+          # HTTP-эдж hub.mos.ru отдаёт 403 раннерам GitHub, поэтому основной транспорт — SSH
+          if [ -n "${MOSHUB_SSH_KEY}" ]; then
+            mkdir -p ~/.ssh && chmod 700 ~/.ssh
+            printf '%s\n' "$MOSHUB_SSH_KEY" > ~/.ssh/id_ed25519
+            chmod 600 ~/.ssh/id_ed25519
+            export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -i $HOME/.ssh/id_ed25519"
+            CLONE_URL="git@hub.mos.ru:84304/whitelist.git"
+            echo "Транспорт: SSH (deploy key MOSHUB_SSH_KEY)"
+          else
+            CLONE_URL="https://oauth2:${WHITELIST_TOKEN}@hub.mos.ru/84304/whitelist.git"
+            echo "Транспорт: HTTPS (WHITELIST_TOKEN)"
+          fi
 
           # Диагностика доступа: печатает HTTP-код и тело ответа, сам токен не выводится
           probe_mh() {
             echo "== Диагностика Мос.Хаб =="
+            if [ -n "${MOSHUB_SSH_KEY}" ]; then
+              ssh -o BatchMode=yes -T git@hub.mos.ru 2>&1 | head -n 5 || true
+              echo "Permission denied (publickey) = deploy key не добавлен в проект или без права записи"
+              return 0
+            fi
             for cred in "oauth2:${WHITELIST_TOKEN}" "oauth2:dummy_invalid_token"; do
               code=$(curl -sS -o /tmp/mh_body.txt -w '%{http_code}' -u "$cred" \
                 "https://hub.mos.ru/84304/whitelist.git/info/refs?service=git-upload-pack" || echo "000")
@@ -143,8 +160,8 @@ jobs:
               break
             fi
             echo "$err"
-            if echo "$err" | grep -qE 'error: (401|403)'; then
-              echo "ОШИБКА: Мос.Хаб отклонил доступ (401/403), повторять бессмысленно"
+            if echo "$err" | grep -qE 'error: (401|403)|Permission denied'; then
+              echo "ОШИБКА: Мос.Хаб отклонил доступ (401/403/publickey), повторять бессмысленно"
               probe_mh
               exit 1
             fi
